@@ -1,0 +1,46 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/framework/core" },
+    { "path": "packages/framework/templates" },
+    { "path": "packages/framework/validation" },
+    { "path": "packages/framework/error-handler" },
+    { "path": "packages/framework/logger" },
+    { "path": "packages/framework/response" },
+    { "path": "packages/framework/testing" },
+    { "path": "packages/modules/supabase" },
+    { "path": "packages/tooling/eslint-config" },
+    { "path": "packages/tooling/typescript-config" },
+    { "path": "packages/tooling/ui" },
+    { "path": "apps/web" },
+    { "path": "apps/docs" }
+  ],
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "esModuleInterop": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "declaration": true,
+    "sourceMap": true,
+    "composite": true,
+    "baseUrl": ".",
+    "paths": {
+      "@brickend/core": ["packages/framework/core/src"],
+      "@brickend/templates": ["packages/framework/templates/src"],
+      "@brickend/validation": ["packages/framework/validation/src"],
+      "@brickend/error-handler": ["packages/framework/error-handler/src"],
+      "@brickend/logger": ["packages/framework/logger/src"],
+      "@brickend/response": ["packages/framework/response/src"],
+      "@brickend/testing": ["packages/framework/testing/src"],
+      "@brickend/supabase": ["packages/modules/supabase/src"],
+      "@brickend/firebase": ["packages/modules/firebase/src"],
+      "@brickend/auth0": ["packages/modules/auth0/src"],
+      "@brickend/eslint-config": ["packages/tooling/eslint-config"],
+      "@brickend/typescript-config": ["packages/tooling/typescript-config"],
+      "@brickend/ui": ["packages/tooling/ui/src"]
+    }
+  }
+}
