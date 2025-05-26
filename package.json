@@ -1,5 +1,6 @@
 {
-  "name": "brickend-temp",
+  "name": "brickend",
+  "version": "0.0.1",
   "private": true,
   "scripts": {
     "build": "turbo run build",
@@ -12,7 +13,7 @@
     "prettier": "^3.5.3",
     "turbo": "^2.5.3",
     "typescript": "5.8.2",
-    "eslint": "9.15.0"
+    "eslint": "^9.27.0"
   },
   "engines": {
     "node": ">=22"
@@ -20,6 +21,9 @@
   "packageManager": "bun@1.2.10",
   "workspaces": [
     "apps/*",
-    "packages/*"
+    "packages/*",
+    "packages/tooling/*",
+    "packages/framework/*",
+    "packages/modules/*"
   ]
 }

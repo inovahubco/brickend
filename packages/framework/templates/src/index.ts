@@ -37,4 +37,4 @@ export class TemplateEngine {
     const template = readFileSync(templatePath, 'utf-8');
     return ejs.render(template, data, { async: true });
   }
-} 
+}

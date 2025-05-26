@@ -1,0 +1,30 @@
+{
+  "name": "@brickend/templates",
+  "version": "0.0.1",
+  "description": "Template system for Brickend framework code generation",
+  "private": false,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "templates"
+  ],
+  "scripts": {
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "ejs": "^3.1.9"
+  },
+  "devDependencies": {
+    "@types/ejs": "^3.1.5",
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.0",
+    "eslint": "^9.27.0",
+    "@brickend/eslint-config": "*"
+  }
+}

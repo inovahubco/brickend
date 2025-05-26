@@ -1,4 +1,4 @@
-import { Button } from '@repo/ui';
+import { Button } from '@brickend/ui';
 
 export default function Home() {
   return (

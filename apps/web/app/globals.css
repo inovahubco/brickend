@@ -1,5 +1,5 @@
 @import "tailwindcss";
-@import "@repo/ui/styles.css";
+@import "@brickend/ui/styles.css";
 
 @custom-variant dark (&:is(.dark *));
 
