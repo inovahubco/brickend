@@ -29,7 +29,6 @@
     "plugins"
   ],
   "author": "",
-  "license": "MIT",
   "dependencies": {
     "fastify": "^5.3.3",
     "@fastify/cors": "^10.1.0",
@@ -46,24 +45,8 @@
     "ts-jest": "^29.3.4",
     "typescript": "^5.8.3"
   },
-  "peerDependencies": {
-    "@brickend/validation": "*",
-    "@brickend/logger": "*",
-    "@brickend/error-handler": "*"
-  },
-  "peerDependenciesMeta": {
-    "@brickend/validation": {
-      "optional": true
-    },
-    "@brickend/logger": {
-      "optional": true
-    },
-    "@brickend/error-handler": {
-      "optional": true
-    }
-  },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=22"
   },
   "exports": {
     ".": {

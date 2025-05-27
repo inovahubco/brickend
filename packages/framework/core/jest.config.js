@@ -1,45 +1,30 @@
 /** @type {import('jest').Config} */
 export default {
-    // Usar ts-jest para TypeScript
     preset: 'ts-jest/presets/default-esm',
-
-    // Configuración para ES modules
+    testEnvironment: 'node',
     extensionsToTreatAsEsm: ['.ts'],
 
-    // Environment
-    testEnvironment: 'node',
-
-    // Module name mapping para imports
-    moduleNameMapping: {
-        '^(\\.{1,2}/.*)\\.js$': '$1',
+    moduleNameMapper: {
+        '^(\\.{1,2}/.*)\\.js$': '$1'
     },
 
-    // Transform settings
     transform: {
-        '^.+\\.ts$': ['ts-jest', {
+        '^.+\\.tsx?$': ['ts-jest', {
             useESM: true,
-            tsconfig: {
-                module: 'ESNext',
-                target: 'ES2022'
-            }
+            tsconfig: { module: 'ESNext', target: 'ES2022' }
         }]
     },
+    transformIgnorePatterns: ['/node_modules/'],
 
-    // Test file patterns
     testMatch: [
         '**/__tests__/**/*.test.ts',
-        '**/*.test.ts'
+        '**/?(*.)+(spec|test).ts'
     ],
 
-    // Coverage settings
     collectCoverageFrom: [
-        'src/**/*.ts',
-        '!src/**/*.d.ts',
-        '!src/**/__tests__/**',
-        '!src/**/test.ts'
+        'src/**/*.{ts,tsx}',
+        '!src/**/*.d.ts'
     ],
-
-    // Coverage thresholds
     coverageThreshold: {
         global: {
             branches: 70,
@@ -49,15 +34,7 @@ export default {
         }
     },
 
-    // Setup files
     setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup.ts'],
-
-    // Timeout for tests
-    testTimeout: 30000,
-
-    // Clear mocks between tests
     clearMocks: true,
-
-    // Verbose output
     verbose: true
 };
