@@ -1,0 +1,38 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "lib": ["deno.window"],
+    "strict": true,
+    "types": ["https://deno.land/x/zod@v3.22.4/mod.ts"]
+  },
+  "imports": {
+    "@std/http": "https://deno.land/std@0.208.0/http/mod.ts",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.38.4",
+    "zod": "https://deno.land/x/zod@v3.22.4/mod.ts"
+  },
+  "tasks": {
+    "start": "deno run --allow-net --allow-env --allow-read supabase/functions/api/index.ts",
+    "dev": "deno run --allow-net --allow-env --allow-read --watch supabase/functions/api/index.ts",
+    "test": "deno test --allow-net --allow-env --allow-read",
+    "fmt": "deno fmt",
+    "lint": "deno lint"
+  },
+  "fmt": {
+    "files": {
+      "include": ["supabase/functions/"]
+    },
+    "options": {
+      "useTabs": false,
+      "lineWidth": 100,
+      "indentWidth": 2,
+      "semiColons": true,
+      "singleQuote": false,
+      "proseWrap": "preserve"
+    }
+  },
+  "lint": {
+    "files": {
+      "include": ["supabase/functions/"]
+    }
+  }
+} 
