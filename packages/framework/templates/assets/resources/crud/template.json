@@ -1,0 +1,19 @@
+{
+  "name": "CRUD Resource",
+  "description": "A complete CRUD resource with routes, validation, and tests",
+  "version": "1.0.0",
+  "author": "Brickend Team",
+  "tags": ["crud", "resource", "api", "routes"],
+  "requiredVariables": ["name", "fields"],
+  "dependencies": ["@brickend/core"],
+  "features": [
+    "GET /resources - List all",
+    "GET /resources/:id - Get by ID",
+    "POST /resources - Create new",
+    "PUT /resources/:id - Update existing",
+    "DELETE /resources/:id - Delete by ID",
+    "Input validation with Zod",
+    "TypeScript types",
+    "Comprehensive tests"
+  ]
+}

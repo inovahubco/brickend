@@ -1,0 +1,275 @@
+{
+  "name": "<%= names.kebabCase %>",
+  "version": "<%= variables.version || '0.1.0' %>",
+  "description": "<%= variables.description || 'A Brickend project' %>",
+  "main": "<%= variables.main || 'dist/index.js' %>",
+  "type": "<%= variables.moduleType || 'module' %>",
+  <% if (variables.bin) { %>
+  "bin": <% if (typeof variables.bin === 'string') { %>"<%= variables.bin %>"<% } else { %>{
+    <% Object.keys(variables.bin).forEach(function(key, index, arr) { %>
+    "<%= key %>": "<%= variables.bin[key] %>"<%= index < arr.length - 1 ? ',' : '' %>
+    <% }); %>
+  }<% } %>,
+  <% } %>
+  "files": [
+    <% if (variables.projectType === 'library') { %>
+    "dist",
+    "src",
+    "README.md",
+    "LICENSE"<% } else { %>
+    "dist"<% if (variables.includeAssets) { %>,
+    "assets"<% } %><% if (variables.includePublic) { %>,
+    "public"<% } %><% } %>
+  ],
+  "scripts": {
+    <% if (variables.projectType === 'api' || variables.projectType === 'fullstack') { %>
+    "build": "tsc",
+    "dev": "<%= variables.devCommand || 'tsx --watch src/index.ts' %>",
+    "start": "node dist/index.js",
+    "start:prod": "NODE_ENV=production node dist/index.js",
+    <% } else if (variables.projectType === 'cli') { %>
+    "build": "tsc",
+    "dev": "tsx --watch src/cli.ts",
+    "cli": "node dist/cli.js",
+    "start": "npm run cli",
+    <% } else if (variables.projectType === 'library') { %>
+    "build": "tsc && npm run build:declarations",
+    "build:declarations": "tsc --emitDeclarationOnly --outDir dist/types",
+    "dev": "tsc --watch",
+    "prepublishOnly": "npm run build && npm run test",
+    <% } else if (variables.projectType === 'worker') { %>
+    "build": "tsc",
+    "dev": "<%= variables.runtime === 'deno' ? 'deno run --watch src/worker.ts' : 'tsx --watch src/worker.ts' %>",
+    "start": "<%= variables.runtime === 'deno' ? 'deno run src/worker.ts' : 'node dist/worker.js' %>",
+    <% } else { %>
+    "build": "tsc",
+    "dev": "tsx --watch src/index.ts",
+    "start": "node dist/index.js",
+    <% } %>
+    "lint": "eslint src/**/*.ts<%= variables.lintFix ? ' --fix' : '' %>",
+    "lint:check": "eslint src/**/*.ts",
+    "format": "prettier --write src/**/*.{ts,js,json}",
+    "format:check": "prettier --check src/**/*.{ts,js,json}",
+    "test": "<%= variables.testRunner || 'jest' %>",
+    "test:watch": "<%= variables.testRunner || 'jest' %> --watch",
+    "test:coverage": "<%= variables.testRunner || 'jest' %> --coverage",
+    <% if (variables.e2eTests) { %>
+    "test:e2e": "<%= variables.e2eRunner || 'playwright test' %>",
+    <% } %>
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit"<% if (variables.docker) { %>,
+    "docker:build": "docker build -t <%= names.kebabCase %> .",
+    "docker:run": "docker run -p 3000:3000 <%= names.kebabCase %>",
+    "docker:dev": "docker-compose up --build"<% } %><% if (variables.deploy) { %>,
+    <% if (variables.deploy === 'vercel') { %>
+    "deploy": "vercel --prod",
+    "deploy:preview": "vercel"
+    <% } else if (variables.deploy === 'railway') { %>
+    "deploy": "railway up"
+    <% } else if (variables.deploy === 'fly') { %>
+    "deploy": "fly deploy"
+    <% } else if (variables.deploy === 'render') { %>
+    "deploy": "render-deploy"
+    <% } else { %>
+    "deploy": "echo 'Configure your deployment command'"
+    <% } %><% } %><% if (variables.database && variables.migrations) { %>,
+    "db:migrate": "<%= variables.migrationCommand || 'tsx src/migrations/migrate.ts' %>",
+    "db:rollback": "<%= variables.rollbackCommand || 'tsx src/migrations/rollback.ts' %>",
+    "db:seed": "<%= variables.seedCommand || 'tsx src/migrations/seed.ts' %>",
+    "db:reset": "npm run db:rollback && npm run db:migrate && npm run db:seed"<% } %>
+  },
+  "keywords": [
+    <% if (variables.projectType) { %>"<%= variables.projectType %>",<% } %>
+    "brickend",
+    "typescript"<% if (variables.keywords) { %>,<% variables.keywords.forEach(function(keyword, index) { %>
+    "<%= keyword %>"<%= index < variables.keywords.length - 1 ? ',' : '' %><% }); %><% } %>
+  ],
+  "author": "<%= variables.author || '' %>",
+  "license": "<%= variables.license || 'MIT' %>",
+  <% if (variables.homepage) { %>
+  "homepage": "<%= variables.homepage %>",
+  <% } %>
+  <% if (variables.repository) { %>
+  "repository": <% if (typeof variables.repository === 'string') { %>{
+    "type": "git",
+    "url": "<%= variables.repository %>"
+  }<% } else { %>{
+    "type": "<%= variables.repository.type || 'git' %>",
+    "url": "<%= variables.repository.url %>"<% if (variables.repository.directory) { %>,
+    "directory": "<%= variables.repository.directory %>"<% } %>
+  }<% } %>,
+  <% } %>
+  <% if (variables.bugs) { %>
+  "bugs": <% if (typeof variables.bugs === 'string') { %>{
+    "url": "<%= variables.bugs %>"
+  }<% } else { %>{
+    "url": "<%= variables.bugs.url %>"<% if (variables.bugs.email) { %>,
+    "email": "<%= variables.bugs.email %>"<% } %>
+  }<% } %>,
+  <% } %>
+  "dependencies": {
+    <% if (variables.projectType === 'api' || variables.projectType === 'fullstack') { %>
+    "@brickend/core": "*"<% if (variables.database === 'supabase') { %>,
+    "@brickend/supabase": "*"<% } else if (variables.database === 'prisma') { %>,
+    "@prisma/client": "^5.0.0"<% } else if (variables.database === 'drizzle') { %>,
+    "drizzle-orm": "^0.29.0"<% } %><% if (variables.auth === 'jwt') { %>,
+    "jsonwebtoken": "^9.0.0",
+    "@types/jsonwebtoken": "^9.0.0"<% } else if (variables.auth === 'supabase') { %>,
+    "@supabase/supabase-js": "^2.0.0"<% } %><% if (variables.validation) { %>,
+    "zod": "^3.22.0"<% } %><% if (variables.cors) { %>,
+    "@fastify/cors": "^9.0.0"<% } %><% if (variables.rateLimit) { %>,
+    "@fastify/rate-limit": "^9.0.0"<% } %><% if (variables.helmet) { %>,
+    "@fastify/helmet": "^11.0.0"<% } %><% if (variables.swagger) { %>,
+    "@fastify/swagger": "^8.0.0",
+    "@fastify/swagger-ui": "^2.0.0"<% } %><% if (variables.redis) { %>,
+    "ioredis": "^5.3.0",
+    "@types/ioredis": "^5.0.0"<% } %>
+    <% } else if (variables.projectType === 'cli') { %>
+    "commander": "^11.0.0",
+    "inquirer": "^9.0.0",
+    "@types/inquirer": "^9.0.0",
+    "chalk": "^5.0.0",
+    "ora": "^7.0.0"
+    <% } else if (variables.projectType === 'library') { %>
+    "@brickend/core": "*"<% if (variables.validation) { %>,
+    "zod": "^3.22.0"<% } %>
+    <% } else if (variables.projectType === 'worker') { %>
+    <% if (variables.runtime === 'cloudflare') { %>
+    "@cloudflare/workers-types": "^4.0.0"
+    <% } else if (variables.runtime === 'deno') { %>
+    <% } else { %>
+    "@brickend/core": "*"
+    <% } %>
+    <% } else { %>
+    "@brickend/core": "*"
+    <% } %>
+  },
+  "devDependencies": {
+    "@types/node": "^<%= variables.nodeTypesVersion || '22.15.18' %>",
+    <% if (variables.runtime !== 'deno') { %>
+    "tsx": "^4.19.2",
+    <% } %>
+    "typescript": "^<%= variables.typescriptVersion || '5.8.3' %>",
+    "eslint": "^9.27.0",
+    <% if (variables.projectType === 'library') { %>
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    <% } %>
+    "prettier": "^3.0.0",
+    <% if (variables.testRunner === 'jest' || !variables.testRunner) { %>
+    "jest": "^29.7.0",
+    "@types/jest": "^29.5.14",
+    "ts-jest": "^29.3.4"<% if (variables.projectType === 'api') { %>,
+    "jest-extended": "^4.0.2"<% } %>
+    <% } else if (variables.testRunner === 'vitest') { %>
+    "vitest": "^1.0.0",
+    "@vitest/ui": "^1.0.0"
+    <% } else if (variables.testRunner === 'bun') { %>
+    "bun-types": "latest"
+    <% } %><% if (variables.e2eTests) { %>,
+    <% if (variables.e2eRunner === 'playwright') { %>
+    "@playwright/test": "^1.40.0"
+    <% } else if (variables.e2eRunner === 'cypress') { %>
+    "cypress": "^13.0.0"
+    <% } %>
+    <% } %><% if (variables.docker) { %>,
+    "@types/dockerode": "^3.3.0"
+    <% } %><% if (variables.database === 'prisma') { %>,
+    "prisma": "^5.0.0"
+    <% } else if (variables.database === 'drizzle') { %>,
+    "drizzle-kit": "^0.20.0"
+    <% } %><% if (variables.bundler === 'esbuild') { %>,
+    "esbuild": "^0.19.0"
+    <% } else if (variables.bundler === 'rollup') { %>,
+    "rollup": "^4.0.0",
+    "@rollup/plugin-typescript": "^11.0.0"
+    <% } else if (variables.bundler === 'webpack') { %>,
+    "webpack": "^5.0.0",
+    "webpack-cli": "^5.0.0",
+    "ts-loader": "^9.0.0"
+    <% } %>
+  },
+  <% if (variables.peerDependencies) { %>
+  "peerDependencies": {
+    <% Object.keys(variables.peerDependencies).forEach(function(dep, index, arr) { %>
+    "<%= dep %>": "<%= variables.peerDependencies[dep] %>"<%= index < arr.length - 1 ? ',' : '' %>
+    <% }); %>
+  },
+  <% } %>
+  <% if (variables.optionalDependencies) { %>
+  "optionalDependencies": {
+    <% Object.keys(variables.optionalDependencies).forEach(function(dep, index, arr) { %>
+    "<%= dep %>": "<%= variables.optionalDependencies[dep] %>"<%= index < arr.length - 1 ? ',' : '' %>
+    <% }); %>
+  },
+  <% } %>
+  "engines": {
+    "node": ">= <%= variables.nodeVersion || '22' %>",
+    <% if (variables.npmVersion) { %>
+    "npm": ">= <%= variables.npmVersion %>",
+    <% } %>
+    <% if (variables.packageManager === 'pnpm') { %>
+    "pnpm": ">= <%= variables.pnpmVersion || '8' %>"
+    <% } else if (variables.packageManager === 'yarn') { %>
+    "yarn": ">= <%= variables.yarnVersion || '3' %>"
+    <% } else if (variables.packageManager === 'bun') { %>
+    "bun": ">= <%= variables.bunVersion || '1' %>"
+    <% } %>
+  },
+  <% if (variables.packageManager) { %>
+  "packageManager": "<%= variables.packageManager %>@<% if (variables.packageManager === 'pnpm') { %><%= variables.pnpmVersion || '8.15.0' %><% } else if (variables.packageManager === 'yarn') { %><%= variables.yarnVersion || '3.6.0' %><% } else if (variables.packageManager === 'bun') { %><%= variables.bunVersion || '1.0.0' %><% } else { %><%= variables.npmVersion || '10.0.0' %><% } %>",
+  <% } %>
+  <% if (variables.projectType === 'library') { %>
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs",
+      "types": "./dist/types/index.d.ts"
+    }<% if (variables.subExports) { %>,
+    <% Object.keys(variables.subExports).forEach(function(key, index, arr) { %>
+    "./<%= key %>": {
+      "import": "./dist/<%= variables.subExports[key] %>.js",
+      "require": "./dist/<%= variables.subExports[key] %>.cjs",
+      "types": "./dist/types/<%= variables.subExports[key] %>.d.ts"
+    }<%= index < arr.length - 1 ? ',' : '' %>
+    <% }); %>
+    <% } %>
+  },
+  <% } %>
+  <% if (variables.workspaces) { %>
+  "workspaces": [
+    <% variables.workspaces.forEach(function(workspace, index) { %>
+    "<%= workspace %>"<%= index < variables.workspaces.length - 1 ? ',' : '' %>
+    <% }); %>
+  ],
+  <% } %>
+  <% if (variables.publishConfig) { %>
+  "publishConfig": {
+    <% Object.keys(variables.publishConfig).forEach(function(key, index, arr) { %>
+    "<%= key %>": <% if (typeof variables.publishConfig[key] === 'string') { %>"<%= variables.publishConfig[key] %>"<% } else { %><%= JSON.stringify(variables.publishConfig[key]) %><% } %><%= index < arr.length - 1 ? ',' : '' %>
+    <% }); %>
+  },
+  <% } %>
+  <% if (variables.browserslist) { %>
+  "browserslist": [
+    <% variables.browserslist.forEach(function(browser, index) { %>
+    "<%= browser %>"<%= index < variables.browserslist.length - 1 ? ',' : '' %>
+    <% }); %>
+  ],
+  <% } %>
+  <% if (variables.volta) { %>
+  "volta": {
+    "node": "<%= variables.volta.node || variables.nodeVersion || '22.0.0' %>",
+    <% if (variables.volta.npm) { %>
+    "npm": "<%= variables.volta.npm %>",
+    <% } %>
+    <% if (variables.volta.yarn) { %>
+    "yarn": "<%= variables.volta.yarn %>",
+    <% } %>
+    <% if (variables.volta.pnpm) { %>
+    "pnpm": "<%= variables.volta.pnpm %>"
+    <% } %>
+  },
+  <% } %>
+  "private": <%= variables.private || false %>
+}

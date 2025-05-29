@@ -1,0 +1,17 @@
+{
+  "name": "Basic API",
+  "description": "A basic Brickend API project with essential features",
+  "version": "1.0.0",
+  "author": "Brickend Team",
+  "tags": ["api", "basic", "starter"],
+  "requiredVariables": ["name"],
+  "dependencies": ["@brickend/core"],
+  "features": [
+    "Brickend Core integration",
+    "Health check endpoint",
+    "Error handling",
+    "TypeScript configuration",
+    "Development scripts",
+    "Basic project structure"
+  ]
+}
