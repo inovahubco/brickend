@@ -8,7 +8,15 @@
     - entity.fields[*].names.snake and entity.fields[*].sql_type for columns
 #}
 
-from sqlalchemy import Column, {{ entity.fields | map(attribute="sql_type") | unique | join(", ") }}
+{# Collect all SQL types from all entities and fields #}
+{% set all_sql_types = [] %}
+{% for entity in entities %}
+    {% for field in entity.fields %}
+        {% set _ = all_sql_types.append(field.sql_type) %}
+    {% endfor %}
+{% endfor %}
+
+from sqlalchemy import Column, {{ all_sql_types | unique | join(", ") }}
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
