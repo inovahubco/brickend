@@ -1,0 +1,30 @@
+# Byte-compiled / optimized
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+.venv/
+venv/
+
+# Local environment files
+.env
+.env.*
+.venv
+
+# SQLite database
+*.sqlite3
+
+# Logs
+*.log
+
+# Editor/IDE configuration files
+.vscode/
+.idea/
+
+# Distribution folders
+dist/
+build/
+*.egg-info/
+
+# MacOS Files
+.DS_Store
