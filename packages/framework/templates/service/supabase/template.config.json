@@ -1,0 +1,444 @@
+{
+  "name": "supabase-crud-service",
+  "version": "0.0.1",
+  "description": "Complete CRUD service with Supabase backend, Edge Functions, and TypeScript client generation",
+  "author": "Brickend Framework",
+
+  "category": "service",
+  "provider": "supabase",
+  "tags": ["crud", "api", "supabase", "edge-functions", "typescript", "auth"],
+
+  "brickendVersion": ">=0.0.1",
+  "nodeVersion": ">=22.0.0",
+
+  "variables": [
+    {
+      "name": "projectName",
+      "type": "string",
+      "required": true,
+      "description": "Name of the project (kebab-case recommended)",
+      "validation": {
+        "pattern": "^[a-z0-9-]+$",
+        "minLength": 2,
+        "maxLength": 50
+      }
+    },
+    {
+      "name": "projectDescription",
+      "type": "string",
+      "required": false,
+      "description": "Brief description of the project",
+      "defaultValue": "CRUD API service built with Supabase"
+    },
+    {
+      "name": "supabaseProjectId",
+      "type": "string",
+      "required": true,
+      "description": "Supabase project ID",
+      "validation": {
+        "pattern": "^[a-z0-9]{20}$"
+      }
+    },
+    {
+      "name": "supabaseUrl",
+      "type": "string",
+      "required": false,
+      "description": "Supabase project URL (auto-generated if not provided)"
+    },
+    {
+      "name": "enableAuth",
+      "type": "boolean",
+      "required": false,
+      "description": "Enable authentication and authorization",
+      "defaultValue": true
+    },
+    {
+      "name": "enableRLS",
+      "type": "boolean",
+      "required": false,
+      "description": "Enable Row Level Security policies",
+      "defaultValue": true
+    },
+    {
+      "name": "enableRealtime",
+      "type": "boolean",
+      "required": false,
+      "description": "Enable realtime subscriptions",
+      "defaultValue": false
+    },
+    {
+      "name": "enableStorage",
+      "type": "boolean",
+      "required": false,
+      "description": "Enable file storage functionality",
+      "defaultValue": false
+    },
+    {
+      "name": "enableTimestamps",
+      "type": "boolean",
+      "required": false,
+      "description": "Add created_at and updated_at timestamps to tables",
+      "defaultValue": true
+    },
+    {
+      "name": "enableSoftDelete",
+      "type": "boolean",
+      "required": false,
+      "description": "Enable soft delete with deleted_at column",
+      "defaultValue": false
+    },
+    {
+      "name": "enableLogging",
+      "type": "boolean",
+      "required": false,
+      "description": "Enable structured logging in Edge Functions",
+      "defaultValue": true
+    },
+    {
+      "name": "enableCors",
+      "type": "boolean",
+      "required": false,
+      "description": "Enable CORS middleware",
+      "defaultValue": true
+    },
+    {
+      "name": "enableRateLimit",
+      "type": "boolean",
+      "required": false,
+      "description": "Enable rate limiting",
+      "defaultValue": false
+    },
+    {
+      "name": "deployTarget",
+      "type": "string",
+      "required": false,
+      "description": "Deployment target",
+      "defaultValue": "vercel",
+      "validation": {
+        "enum": ["vercel", "netlify", "manual"]
+      }
+    },
+    {
+      "name": "generateClients",
+      "type": "string",
+      "required": false,
+      "description": "Types of clients to generate",
+      "defaultValue": "all",
+      "validation": {
+        "enum": ["server", "browser", "typed", "all"]
+      }
+    },
+    {
+      "name": "author",
+      "type": "string",
+      "required": false,
+      "description": "Project author name",
+      "defaultValue": "Developer"
+    },
+    {
+      "name": "license",
+      "type": "string",
+      "required": false,
+      "description": "Project license",
+      "defaultValue": "MIT",
+      "validation": {
+        "enum": ["MIT", "Apache-2.0", "GPL-3.0", "BSD-3-Clause", "ISC"]
+      }
+    }
+  ],
+
+  "dependencies": [
+    {
+      "name": "@supabase/supabase-js",
+      "version": "^2.45.4"
+    },
+    {
+      "name": "zod",
+      "version": "^3.23.8"
+    }
+  ],
+
+  "devDependencies": [
+    {
+      "name": "@types/node",
+      "version": "^22.15.18"
+    },
+    {
+      "name": "typescript",
+      "version": "^5.8.2"
+    },
+    {
+      "name": "supabase",
+      "version": "^1.200.3"
+    }
+  ],
+
+  "files": [
+    {
+      "source": "supabase/config.toml.ejs",
+      "destination": "supabase/config.toml"
+    },
+    {
+      "source": "supabase/seed.sql.ejs",
+      "destination": "supabase/seed.sql"
+    },
+    {
+      "source": "supabase/migrations/{{timestamp}}_initial_schema.sql.ejs",
+      "destination": "supabase/migrations/{{timestamps.generatedTimestamp}}_initial_schema.sql"
+    },
+    {
+      "source": "supabase/functions/shared/types.ts.ejs",
+      "destination": "supabase/functions/shared/types.ts"
+    },
+    {
+      "source": "supabase/functions/shared/middleware.ts.ejs",
+      "destination": "supabase/functions/shared/middleware.ts"
+    },
+    {
+      "source": "supabase/functions/shared/error-handlers.ts.ejs",
+      "destination": "supabase/functions/shared/error-handlers.ts"
+    },
+    {
+      "source": "supabase/functions/shared/validation.ts.ejs",
+      "destination": "supabase/functions/shared/validation.ts"
+    },
+    {
+      "source": "supabase/functions/{{entity.kebabName}}/create.ts.ejs",
+      "destination": "supabase/functions/{{entity.kebabName}}/create.ts",
+      "condition": "entities.length > 0"
+    },
+    {
+      "source": "supabase/functions/{{entity.kebabName}}/read.ts.ejs",
+      "destination": "supabase/functions/{{entity.kebabName}}/read.ts",
+      "condition": "entities.length > 0"
+    },
+    {
+      "source": "supabase/functions/{{entity.kebabName}}/list.ts.ejs",
+      "destination": "supabase/functions/{{entity.kebabName}}/list.ts",
+      "condition": "entities.length > 0"
+    },
+    {
+      "source": "supabase/functions/{{entity.kebabName}}/update.ts.ejs",
+      "destination": "supabase/functions/{{entity.kebabName}}/update.ts",
+      "condition": "entities.length > 0"
+    },
+    {
+      "source": "supabase/functions/{{entity.kebabName}}/delete.ts.ejs",
+      "destination": "supabase/functions/{{entity.kebabName}}/delete.ts",
+      "condition": "entities.length > 0"
+    },
+    {
+      "source": "supabase/functions/{{entity.kebabName}}/stats.ts.ejs",
+      "destination": "supabase/functions/{{entity.kebabName}}/stats.ts",
+      "condition": "entities.length > 0"
+    },
+    {
+      "source": "lib/supabase-server.ts.ejs",
+      "destination": "lib/supabase-server.ts",
+      "condition": "variables.generateClients === 'server' || variables.generateClients === 'all'"
+    },
+    {
+      "source": "lib/supabase-browser.ts.ejs",
+      "destination": "lib/supabase-browser.ts",
+      "condition": "variables.generateClients === 'browser' || variables.generateClients === 'all'"
+    },
+    {
+      "source": "lib/typed-client.ts.ejs",
+      "destination": "lib/typed-client.ts",
+      "condition": "variables.generateClients === 'typed' || variables.generateClients === 'all'"
+    },
+    {
+      "source": "lib/auth-helpers.ts.ejs",
+      "destination": "lib/auth-helpers.ts",
+      "condition": "variables.enableAuth"
+    },
+    {
+      "source": "package.json.ejs",
+      "destination": "package.json"
+    },
+    {
+      "source": "README.md.ejs",
+      "destination": "README.md"
+    },
+    {
+      "source": ".env.example.ejs",
+      "destination": ".env.example"
+    },
+    {
+      "source": ".env.local.ejs",
+      "destination": ".env.local"
+    },
+    {
+      "source": "tsconfig.json.ejs",
+      "destination": "tsconfig.json"
+    },
+    {
+      "source": "vercel.json.ejs",
+      "destination": "vercel.json",
+      "condition": "variables.deployTarget === 'vercel'"
+    },
+    {
+      "source": "netlify.toml.ejs",
+      "destination": "netlify.toml",
+      "condition": "variables.deployTarget === 'netlify'"
+    },
+    {
+      "source": ".gitignore.ejs",
+      "destination": ".gitignore"
+    }
+  ],
+
+  "postProcessors": [
+    {
+      "name": "prettier",
+      "config": {
+        "semi": true,
+        "singleQuote": true,
+        "tabWidth": 2,
+        "trailingComma": "es5"
+      },
+      "filePatterns": ["**/*.ts", "**/*.js", "**/*.json", "**/*.md"]
+    }
+  ],
+
+  "hooks": {
+    "afterGenerate": ["npm install", "supabase start", "supabase db reset"],
+    "beforeDeploy": ["npm run build", "supabase db push"]
+  },
+
+  "features": [
+    "crud",
+    "auth",
+    "realtime",
+    "storage",
+    "migration",
+    "validation",
+    "typescript",
+    "edge-functions"
+  ],
+
+  "supports": {
+    "entities": true,
+    "auth": true,
+    "deployment": true
+  },
+
+  "documentation": {
+    "readme": "Complete CRUD service template with Supabase backend",
+    "setupInstructions": [
+      "1. Create a new Supabase project at https://supabase.com",
+      "2. Copy your project ID and configure environment variables",
+      "3. Run `supabase start` to start local development",
+      "4. Run `supabase db reset` to apply initial migration",
+      "5. Your API endpoints will be available at `/functions/v1/`"
+    ],
+    "apiEndpoints": [
+      "POST /{entity} - Create new entity",
+      "GET /{entity}/{id} - Get entity by ID",
+      "GET /{entity} - List entities with pagination",
+      "PUT /{entity}/{id} - Update entity by ID",
+      "DELETE /{entity}/{id} - Delete entity by ID",
+      "GET /{entity}/stats - Get entity statistics"
+    ],
+    "environmentVariables": [
+      "SUPABASE_URL - Your Supabase project URL",
+      "SUPABASE_ANON_KEY - Your Supabase anonymous key",
+      "SUPABASE_SERVICE_ROLE_KEY - Your Supabase service role key"
+    ]
+  },
+
+  "examples": [
+    {
+      "name": "Todo API",
+      "description": "Simple todo list API with user authentication",
+      "entities": [
+        {
+          "name": "Todo",
+          "fields": [
+            {
+              "name": "title",
+              "type": "string",
+              "validation": { "required": true, "maxLength": 100 }
+            },
+            {
+              "name": "description",
+              "type": "text",
+              "validation": { "required": false }
+            },
+            {
+              "name": "completed",
+              "type": "boolean",
+              "options": { "defaultValue": false }
+            },
+            {
+              "name": "due_date",
+              "type": "datetime",
+              "validation": { "required": false }
+            }
+          ],
+          "options": {
+            "timestamps": true,
+            "softDelete": false,
+            "rowLevelSecurity": true
+          }
+        }
+      ]
+    },
+    {
+      "name": "Blog API",
+      "description": "Blog posts and comments with author relationships",
+      "entities": [
+        {
+          "name": "Post",
+          "fields": [
+            {
+              "name": "title",
+              "type": "string",
+              "validation": { "required": true, "maxLength": 200 }
+            },
+            {
+              "name": "content",
+              "type": "text",
+              "validation": { "required": true }
+            },
+            {
+              "name": "published",
+              "type": "boolean",
+              "options": { "defaultValue": false }
+            }
+          ],
+          "options": {
+            "timestamps": true,
+            "rowLevelSecurity": true
+          }
+        },
+        {
+          "name": "Comment",
+          "fields": [
+            {
+              "name": "content",
+              "type": "text",
+              "validation": { "required": true }
+            },
+            {
+              "name": "post_id",
+              "type": "uuid",
+              "validation": { "required": true }
+            }
+          ],
+          "relationships": {
+            "post": {
+              "type": "manyToOne",
+              "target": "Post",
+              "foreignKey": "post_id"
+            }
+          },
+          "options": {
+            "timestamps": true,
+            "rowLevelSecurity": true
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,339 @@
+{
+  "$schema": "https://deno.land/x/deno/cli/schemas/config-file.v1.json",
+  "compilerOptions": {
+    "allowJs": <%= project.deno?.allowJs !== false %>,
+    "strict": <%= project.deno?.strict !== false %>,
+    "allowUnreachableCode": false,
+    "allowUnusedLabels": false,
+    "exactOptionalPropertyTypes": <%= project.deno?.exactOptionalPropertyTypes !== false %>,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noImplicitThis": true,
+    "noUncheckedIndexedAccess": <%= project.deno?.noUncheckedIndexedAccess !== false %>,
+    "noUnusedLocals": <%= project.deno?.noUnusedLocals !== false %>,
+    "noUnusedParameters": <%= project.deno?.noUnusedParameters !== false %>,
+    "useUnknownInCatchVariables": true,
+    "checkJs": <%= project.deno?.checkJs !== false %>,
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable",
+      "WebWorker"<% if (project.deno?.additionalLibs) { %>,
+      <% project.deno.additionalLibs.forEach((lib, index) => { %>
+      "<%= lib %>"<%= index < project.deno.additionalLibs.length - 1 ? ',' : '' %>
+      <% }); %>
+      <% } %>
+    ],
+    "target": "<%= project.deno?.target || 'ES2022' %>",
+    "module": "<%= project.deno?.module || 'ESNext' %>",
+    "moduleResolution": "<%= project.deno?.moduleResolution || 'node' %>",
+    "jsx": "<%= project.deno?.jsx || 'react-jsx' %>",
+    "jsxImportSource": "<%= project.deno?.jsxImportSource || 'react' %>"
+  },
+
+  "lint": {
+    "rules": {
+      "tags": ["recommended"],
+      "include": [
+        "ban-untagged-todo",
+        "camelcase",
+        "explicit-function-return-type",
+        "explicit-module-boundary-types",
+        "no-await-in-loop",
+        "no-console",
+        "no-const-assign",
+        "no-debugger",
+        "no-eval",
+        "no-implicit-declare-global",
+        "no-non-null-assertion",
+        "no-sparse-arrays",
+        "no-throw-literal",
+        "no-undef",
+        "no-unreachable",
+        "no-unused-vars",
+        "prefer-const",
+        "single-var-declarator"
+      ]<% if (project.deno?.lint?.exclude && project.deno.lint.exclude.length > 0) { %>,
+      "exclude": [
+        <% project.deno.lint.exclude.forEach((rule, index) => { %>
+        "<%= rule %>"<%= index < project.deno.lint.exclude.length - 1 ? ',' : '' %>
+        <% }); %>
+      ]<% } %>
+    },
+    "files": {
+      "include": [
+        "supabase/functions/**/*.ts",
+        "supabase/shared/**/*.ts"<% if (project.deno?.lint?.additionalFiles) { %>,
+        <% project.deno.lint.additionalFiles.forEach((file, index) => { %>
+        "<%= file %>"<%= index < project.deno.lint.additionalFiles.length - 1 ? ',' : '' %>
+        <% }); %>
+        <% } %>
+      ],
+      "exclude": [
+        "node_modules/",
+        ".supabase/",
+        "dist/",
+        "build/",
+        "coverage/"<% if (project.deno?.lint?.excludeFiles) { %>,
+        <% project.deno.lint.excludeFiles.forEach((file, index) => { %>
+        "<%= file %>"<%= index < project.deno.lint.excludeFiles.length - 1 ? ',' : '' %>
+        <% }); %>
+        <% } %>
+      ]
+    }
+  },
+
+  "fmt": {
+    "useTabs": <%= project.generation?.style?.useTabs || false %>,
+    "lineWidth": <%= project.generation?.style?.lineWidth || 100 %>,
+    "indentWidth": <%= project.generation?.style?.tabWidth || 2 %>,
+    "semiColons": <%= project.generation?.style?.semicolons !== false %>,
+    "singleQuote": <%= project.generation?.style?.quotes === 'single' %>,
+    "proseWrap": "<%= project.deno?.fmt?.proseWrap || 'preserve' %>",
+    "files": {
+      "include": [
+        "supabase/functions/**/*.ts",
+        "supabase/shared/**/*.ts",
+        "*.ts",
+        "*.js",
+        "*.json",
+        "*.md"<% if (project.deno?.fmt?.additionalFiles) { %>,
+        <% project.deno.fmt.additionalFiles.forEach((file, index) => { %>
+        "<%= file %>"<%= index < project.deno.fmt.additionalFiles.length - 1 ? ',' : '' %>
+        <% }); %>
+        <% } %>
+      ],
+      "exclude": [
+        "node_modules/",
+        ".supabase/",
+        "dist/",
+        "build/",
+        "coverage/",
+        "*.min.js",
+        "*.min.css"<% if (project.deno?.fmt?.excludeFiles) { %>,
+        <% project.deno.fmt.excludeFiles.forEach((file, index) => { %>
+        "<%= file %>"<%= index < project.deno.fmt.excludeFiles.length - 1 ? ',' : '' %>
+        <% }); %>
+        <% } %>
+      ]
+    }
+  },
+
+  "test": {
+    "files": {
+      "include": [
+        "supabase/functions/**/*.test.ts",
+        "tests/**/*.test.ts",
+        "**/*_test.ts"<% if (project.deno?.test?.additionalFiles) { %>,
+        <% project.deno.test.additionalFiles.forEach((file, index) => { %>
+        "<%= file %>"<%= index < project.deno.test.additionalFiles.length - 1 ? ',' : '' %>
+        <% }); %>
+        <% } %>
+      ],
+      "exclude": [
+        "node_modules/",
+        ".supabase/",
+        "dist/",
+        "build/"<% if (project.deno?.test?.excludeFiles) { %>,
+        <% project.deno.test.excludeFiles.forEach((file, index) => { %>
+        "<%= file %>"<%= index < project.deno.test.excludeFiles.length - 1 ? ',' : '' %>
+        <% }); %>
+        <% } %>
+      ]
+    }
+  },
+
+  "tasks": {
+    "dev": "supabase start && echo '🚀 Development server ready at http://localhost:54321'",
+    "start": "supabase start",
+    "stop": "supabase stop",
+    "restart": "supabase stop && supabase start",
+    "reset": "supabase db reset --debug",
+    
+    "build": "deno check supabase/functions/**/*.ts",
+    "check": "deno check supabase/functions/**/*.ts",
+    "cache": "deno cache supabase/functions/**/*.ts",
+    
+    "test": "deno test --allow-all --coverage=coverage",
+    "test:watch": "deno test --allow-all --watch",
+    "test:coverage": "deno test --allow-all --coverage=coverage && deno coverage coverage",
+    
+    "lint": "deno lint",
+    "lint:fix": "deno lint --fix",
+    "format": "deno fmt",
+    "format:check": "deno fmt --check",
+    
+    "db:migrate": "supabase migration up",
+    "db:new-migration": "supabase migration new",
+    "db:generate-types": "supabase gen types typescript --local > supabase/shared/interfaces/database.ts",
+    "db:generate-types:remote": "supabase gen types typescript --project-id $SUPABASE_PROJECT_ID > supabase/shared/interfaces/database.ts",
+    "db:seed": "supabase seed run",
+    "db:dump": "supabase db dump --file supabase/seed.sql",
+    
+    "functions:serve": "supabase functions serve --debug",
+    "functions:deploy": "supabase functions deploy --no-verify-jwt",
+    "functions:logs": "supabase functions logs",
+    "functions:logs:tail": "supabase functions logs --follow",
+    
+    <% project.entities.forEach((entity, index) => { %>
+    "deploy:<%= entity.kebabName %>": "supabase functions deploy <%= entity.kebabName %> --no-verify-jwt",
+    "logs:<%= entity.kebabName %>": "supabase functions logs <%= entity.kebabName %>",
+    "serve:<%= entity.kebabName %>": "supabase functions serve <%= entity.kebabName %> --debug",
+    <% }); %>
+    
+    "link": "supabase link --project-ref $SUPABASE_PROJECT_REF",
+    "status": "supabase status",
+    "login": "supabase login",
+    "logout": "supabase logout",
+    
+    "setup": "deno run --allow-read --allow-write --allow-env setup.ts",
+    "clean": "rm -rf .supabase coverage dist build",
+    "deps:update": "deno cache --reload supabase/functions/**/*.ts"<% if (project.deno?.customTasks) { %>,
+    <% Object.entries(project.deno.customTasks).forEach(([name, command], index, arr) => { %>
+    "<%= name %>": "<%= command %>"<%= index < arr.length - 1 ? ',' : '' %>
+    <% }); %>
+    <% } %>
+  },
+
+  "imports": {
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.39.0",
+    "zod": "https://deno.land/x/zod@v3.22.4/mod.ts",
+    
+    "std/": "https://deno.land/std@0.208.0/",
+    "std/assert": "https://deno.land/std@0.208.0/assert/mod.ts",
+    "std/testing": "https://deno.land/std@0.208.0/testing/mod.ts",
+    "std/http": "https://deno.land/std@0.208.0/http/mod.ts",
+    "std/fs": "https://deno.land/std@0.208.0/fs/mod.ts",
+    "std/path": "https://deno.land/std@0.208.0/path/mod.ts",
+    "std/crypto": "https://deno.land/std@0.208.0/crypto/mod.ts",
+    "std/encoding": "https://deno.land/std@0.208.0/encoding/mod.ts",
+    
+    "@/": "./supabase/",
+    "@/shared/": "./supabase/shared/",
+    "@/functions/": "./supabase/functions/",
+    "@/interfaces/": "./supabase/shared/interfaces/",
+    "@/utils/": "./supabase/shared/utils/"<% if (project.deno?.customImports) { %>,
+    <% Object.entries(project.deno.customImports).forEach(([alias, path], index, arr) => { %>
+    "<%= alias %>": "<%= path %>"<%= index < arr.length - 1 ? ',' : '' %>
+    <% }); %>
+    <% } %>
+  },
+
+  "exclude": [
+    "node_modules/",
+    ".supabase/",
+    "dist/",
+    "build/",
+    "coverage/",
+    ".env*",
+    "*.log",
+    ".git/"<% if (project.deno?.excludeGlobal) { %>,
+    <% project.deno.excludeGlobal.forEach((pattern, index) => { %>
+    "<%= pattern %>"<%= index < project.deno.excludeGlobal.length - 1 ? ',' : '' %>
+    <% }); %>
+    <% } %>
+  ],
+
+  "permissions": {
+    "allow-read": [
+      ".env",
+      ".env.local",
+      "supabase/",
+      "."
+    ],
+    "allow-write": [
+      "supabase/migrations/",
+      "coverage/",
+      "logs/"
+    ],
+    "allow-net": [
+      "supabase.com",
+      "*.supabase.co",
+      "deno.land",
+      "esm.sh",
+      "cdn.skypack.dev"<% if (project.deno?.allowedHosts) { %>,
+      <% project.deno.allowedHosts.forEach((host, index) => { %>
+      "<%= host %>"<%= index < project.deno.allowedHosts.length - 1 ? ',' : '' %>
+      <% }); %>
+      <% } %>
+    ],
+    "allow-env": [
+      "SUPABASE_URL",
+      "SUPABASE_ANON_KEY",
+      "SUPABASE_SERVICE_ROLE_KEY"<% if (project.features?.auth !== false) { %>,
+      "SUPABASE_JWT_SECRET"<% } %><% if (project.deno?.allowedEnvVars) { %>,
+      <% project.deno.allowedEnvVars.forEach((envVar, index) => { %>
+      "<%= envVar %>"<%= index < project.deno.allowedEnvVars.length - 1 ? ',' : '' %>
+      <% }); %>
+      <% } %>
+    ]
+  },
+
+  "lock": <%= project.deno?.lockFile !== false %>,
+  "lockWrite": <%= project.deno?.lockWrite !== false %>,
+
+  <% if (project.deno?.unstableFeatures && project.deno.unstableFeatures.length > 0) { %>
+  "unstable": [
+    <% project.deno.unstableFeatures.forEach((feature, index) => { %>
+    "<%= feature %>"<%= index < project.deno.unstableFeatures.length - 1 ? ',' : '' %>
+    <% }); %>
+  ],
+  <% } %>
+
+  "nodeModulesDir": <%= project.deno?.nodeModulesDir || false %>,
+  "vendor": <%= project.deno?.vendor || false %>,
+
+  <% if (project.deno?.workspaces) { %>
+  "workspace": [
+    <% project.deno.workspaces.forEach((workspace, index) => { %>
+    "<%= workspace %>"<%= index < project.deno.workspaces.length - 1 ? ',' : '' %>
+    <% }); %>
+  ],
+  <% } %>
+
+  "publish": {
+    "exclude": [
+      ".env*",
+      "coverage/",
+      "logs/",
+      ".supabase/",
+      "node_modules/",
+      "*.test.ts",
+      "test/",
+      "tests/",
+      "docs/",
+      "examples/"<% if (project.deno?.publish?.excludeFiles) { %>,
+      <% project.deno.publish.excludeFiles.forEach((file, index) => { %>
+      "<%= file %>"<%= index < project.deno.publish.excludeFiles.length - 1 ? ',' : '' %>
+      <% }); %>
+      <% } %>
+    ]
+  },
+
+  "deploy": {
+    "project": "<%= project.name %>",
+    "exclude": [
+      ".env*",
+      "coverage/",
+      "logs/",
+      ".supabase/",
+      "node_modules/",
+      "*.test.ts",
+      "test/",
+      "tests/"<% if (project.deno?.deploy?.excludeFiles) { %>,
+      <% project.deno.deploy.excludeFiles.forEach((file, index) => { %>
+      "<%= file %>"<%= index < project.deno.deploy.excludeFiles.length - 1 ? ',' : '' %>
+      <% }); %>
+      <% } %>
+    ],
+    "include": [
+      "supabase/functions/",
+      "supabase/shared/"<% if (project.deno?.deploy?.includeFiles) { %>,
+      <% project.deno.deploy.includeFiles.forEach((file, index) => { %>
+      "<%= file %>"<%= index < project.deno.deploy.includeFiles.length - 1 ? ',' : '' %>
+      <% }); %>
+      <% } %>
+    ]
+  }
+}

@@ -1,0 +1,440 @@
+<%
+// Import the schema generator to create SQL from entities
+const { SchemaGenerator } = require('@brickend/supabase');
+
+// Build database schema from entities
+const databaseSchema = {
+  entities: entities,
+  version: '1.0.0',
+  description: `Initial schema for ${project.name}`,
+  settings: {
+    enableRLS: variables.enableRLS || features.auth,
+    enableRealtimeByDefault: variables.enableRealtime || features.realtime,
+    timestampsEnabled: variables.enableTimestamps,
+    softDeleteEnabled: variables.enableSoftDelete
+  }
+};
+
+// Generate the SQL using SchemaGenerator
+const generator = new SchemaGenerator(databaseSchema);
+const migration = await generator.generateMigration();
+
+// Output the generated SQL content
+-%>
+<%- migration.content %>
+
+<% if (variables.enableAuth) { -%>
+-- Authentication setup
+-- Enable RLS on auth.users if needed
+ALTER TABLE auth.users ENABLE ROW LEVEL SECURITY;
+
+-- Create profile table for additional user data (optional)
+CREATE TABLE IF NOT EXISTS profiles (
+  id UUID REFERENCES auth.users(id) PRIMARY KEY,
+  email TEXT,
+  full_name TEXT,
+  avatar_url TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
+);
+
+-- Enable RLS on profiles
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+
+-- Profile policies
+CREATE POLICY "Users can view own profile" ON profiles 
+  FOR SELECT USING (auth.uid() = id);
+
+CREATE POLICY "Users can update own profile" ON profiles 
+  FOR UPDATE USING (auth.uid() = id);
+
+CREATE POLICY "Users can insert own profile" ON profiles 
+  FOR INSERT WITH CHECK (auth.uid() = id);
+
+-- Function to handle new user registration
+CREATE OR REPLACE FUNCTION handle_new_user()
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO profiles (id, email, full_name)
+  VALUES (
+    NEW.id,
+    NEW.email,
+    COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.email)
+  );
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Trigger to create profile on user signup
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION handle_new_user();
+
+<% } -%>
+
+<% if (variables.enableStorage) { -%>
+-- Storage setup
+-- Create storage bucket for uploads
+INSERT INTO storage.buckets (id, name, public) 
+VALUES ('<%= utils.kebabCase(project.name) %>-uploads', '<%= project.name %> Uploads', false)
+ON CONFLICT (id) DO NOTHING;
+
+-- Storage policies
+CREATE POLICY "Authenticated users can upload files" ON storage.objects
+  FOR INSERT WITH CHECK (
+    bucket_id = '<%= utils.kebabCase(project.name) %>-uploads' 
+    AND auth.role() = 'authenticated'
+  );
+
+CREATE POLICY "Users can view own files" ON storage.objects
+  FOR SELECT USING (
+    bucket_id = '<%= utils.kebabCase(project.name) %>-uploads' 
+    AND auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+CREATE POLICY "Users can update own files" ON storage.objects
+  FOR UPDATE USING (
+    bucket_id = '<%= utils.kebabCase(project.name) %>-uploads' 
+    AND auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+CREATE POLICY "Users can delete own files" ON storage.objects
+  FOR DELETE USING (
+    bucket_id = '<%= utils.kebabCase(project.name) %>-uploads' 
+    AND auth.uid()::text = (storage.foldername(name))[1]
+  );
+
+<% } -%>
+
+<% if (variables.enableRealtime) { -%>
+-- Realtime setup
+-- Enable realtime for all generated tables
+<% entities.forEach(entity => { 
+  const tableName = entity.options?.tableName || utils.pluralize(entity.name.toLowerCase());
+-%>
+ALTER PUBLICATION supabase_realtime ADD TABLE <%= tableName %>;
+<% }); -%>
+
+<% } -%>
+
+<% if (variables.enableAuth && entities.length > 0) { -%>
+-- Additional RLS policies for user-scoped data
+<% entities.forEach(entity => {
+  const tableName = entity.options?.tableName || utils.pluralize(entity.name.toLowerCase());
+  const hasUserField = entity.fields.some(field => 
+    field.name === 'user_id' || field.name === 'owner_id' || field.name === 'created_by'
+  );
+  
+  if (hasUserField) {
+-%>
+
+-- <%= entity.name %> user-scoped policies
+CREATE POLICY "<%= entity.name %> users can view own records" ON <%= tableName %>
+  FOR SELECT USING (
+    auth.uid() = user_id 
+    <% if (entity.fields.some(f => f.name === 'owner_id')) { %>OR auth.uid() = owner_id<% } %>
+    <% if (entity.fields.some(f => f.name === 'created_by')) { %>OR auth.uid() = created_by<% } %>
+  );
+
+CREATE POLICY "<%= entity.name %> users can insert own records" ON <%= tableName %>
+  FOR INSERT WITH CHECK (
+    auth.uid() = user_id
+    <% if (entity.fields.some(f => f.name === 'owner_id')) { %>OR auth.uid() = owner_id<% } %>
+    <% if (entity.fields.some(f => f.name === 'created_by')) { %>OR auth.uid() = created_by<% } %>
+  );
+
+CREATE POLICY "<%= entity.name %> users can update own records" ON <%= tableName %>
+  FOR UPDATE USING (
+    auth.uid() = user_id
+    <% if (entity.fields.some(f => f.name === 'owner_id')) { %>OR auth.uid() = owner_id<% } %>
+    <% if (entity.fields.some(f => f.name === 'created_by')) { %>OR auth.uid() = created_by<% } %>
+  );
+
+CREATE POLICY "<%= entity.name %> users can delete own records" ON <%= tableName %>
+  FOR DELETE USING (
+    auth.uid() = user_id
+    <% if (entity.fields.some(f => f.name === 'owner_id')) { %>OR auth.uid() = owner_id<% } %>
+    <% if (entity.fields.some(f => f.name === 'created_by')) { %>OR auth.uid() = created_by<% } %>
+  );
+<% 
+  }
+}); -%>
+
+<% } -%>
+
+<% if (variables.enableTimestamps) { -%>
+-- Timestamp trigger function (if not already created by schema generator)
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Apply timestamp triggers to all tables with updated_at column
+<% entities.forEach(entity => {
+  const tableName = entity.options?.tableName || utils.pluralize(entity.name.toLowerCase());
+  if (entity.options?.timestamps !== false) {
+-%>
+CREATE TRIGGER update_<%= tableName %>_updated_at 
+  BEFORE UPDATE ON <%= tableName %>
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+<% 
+  }
+}); -%>
+
+<% } -%>
+
+<% if (entities.some(entity => entity.relationships)) { -%>
+-- Relationship constraints and indexes
+<% entities.forEach(entity => {
+  if (entity.relationships) {
+    Object.entries(entity.relationships).forEach(([relationName, relationship]) => {
+      const tableName = entity.options?.tableName || utils.pluralize(entity.name.toLowerCase());
+      const targetTable = utils.pluralize(relationship.target.toLowerCase());
+      const foreignKey = relationship.foreignKey || `${relationship.target.toLowerCase()}_id`;
+-%>
+
+-- Foreign key constraint for <%= entity.name %> -> <%= relationship.target %>
+ALTER TABLE <%= tableName %> 
+ADD CONSTRAINT fk_<%= tableName %>_<%= relationName %>
+FOREIGN KEY (<%= foreignKey %>) 
+REFERENCES <%= targetTable %>(id)
+<% if (relationship.onDelete) { %>ON DELETE <%= relationship.onDelete %><% } %>
+<% if (relationship.onUpdate) { %>ON UPDATE <%= relationship.onUpdate %><% } %>;
+
+-- Index for foreign key performance
+CREATE INDEX idx_<%= tableName %>_<%= foreignKey %> ON <%= tableName %>(<%= foreignKey %>);
+<% 
+    });
+  }
+}); -%>
+
+<% } -%>
+
+-- Custom functions and triggers
+<% if (variables.enableSoftDelete) { -%>
+
+-- Soft delete function
+CREATE OR REPLACE FUNCTION soft_delete()
+RETURNS TRIGGER AS $$
+BEGIN
+  -- Instead of actually deleting, set deleted_at timestamp
+  UPDATE <%= TG_TABLE_NAME %> 
+  SET deleted_at = NOW() 
+  WHERE id = OLD.id;
+  
+  -- Prevent the actual DELETE
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Apply soft delete triggers to tables with deleted_at column
+<% entities.forEach(entity => {
+  const tableName = entity.options?.tableName || utils.pluralize(entity.name.toLowerCase());
+  if (entity.options?.softDelete) {
+-%>
+CREATE TRIGGER soft_delete_<%= tableName %>
+  BEFORE DELETE ON <%= tableName %>
+  FOR EACH ROW EXECUTE FUNCTION soft_delete();
+<% 
+  }
+}); -%>
+
+<% } -%>
+
+-- Helper functions for common operations
+<% if (variables.enableAuth) { -%>
+
+-- Function to get current user ID
+CREATE OR REPLACE FUNCTION current_user_id()
+RETURNS UUID AS $$
+BEGIN
+  RETURN auth.uid();
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to check if user is admin (example)
+CREATE OR REPLACE FUNCTION is_admin(user_id UUID DEFAULT auth.uid())
+RETURNS BOOLEAN AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM profiles 
+    WHERE id = user_id 
+    AND (raw_user_meta_data->>'role')::text = 'admin'
+  );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+<% } -%>
+
+-- Database views for common queries
+<% entities.forEach(entity => {
+  const tableName = entity.options?.tableName || utils.pluralize(entity.name.toLowerCase());
+  const entityName = utils.camelCase(entity.name);
+  
+  // Create a view for active records (excluding soft deleted)
+  if (entity.options?.softDelete) {
+-%>
+
+-- View for active <%= entity.name %> records (excluding soft deleted)
+CREATE OR REPLACE VIEW active_<%= tableName %> AS
+SELECT * FROM <%= tableName %>
+WHERE deleted_at IS NULL;
+
+<% } -%>
+
+<% 
+  // Create a view with joined relationships if any
+  if (entity.relationships && Object.keys(entity.relationships).length > 0) {
+-%>
+-- View for <%= entity.name %> with related data
+CREATE OR REPLACE VIEW <%= tableName %>_with_relations AS
+SELECT 
+  <%= tableName %>.*,
+<% 
+    Object.entries(entity.relationships).forEach(([relationName, relationship], index, array) => {
+      const targetTable = utils.pluralize(relationship.target.toLowerCase());
+      const foreignKey = relationship.foreignKey || `${relationship.target.toLowerCase()}_id`;
+      const isLast = index === array.length - 1;
+-%>
+  <%= relationName %>.* AS <%= relationName %>_data<%= isLast ? '' : ',' %>
+<% }); -%>
+FROM <%= tableName %>
+<% 
+    Object.entries(entity.relationships).forEach(([relationName, relationship]) => {
+      const targetTable = utils.pluralize(relationship.target.toLowerCase());
+      const foreignKey = relationship.foreignKey || `${relationship.target.toLowerCase()}_id`;
+      const joinType = relationship.type === 'manyToOne' ? 'LEFT JOIN' : 'LEFT JOIN';
+-%>
+<%= joinType %> <%= targetTable %> AS <%= relationName %> ON <%= tableName %>.<%= foreignKey %> = <%= relationName %>.id
+<% }); -%>
+<% if (entity.options?.softDelete) { %>WHERE <%= tableName %>.deleted_at IS NULL<% } %>;
+
+<% 
+  }
+}); -%>
+
+-- Indexes for performance optimization
+<% entities.forEach(entity => {
+  const tableName = entity.options?.tableName || utils.pluralize(entity.name.toLowerCase());
+  
+  // Index commonly queried fields
+  entity.fields.forEach(field => {
+    if (field.validation?.unique && !field.options?.primaryKey) {
+-%>
+CREATE UNIQUE INDEX IF NOT EXISTS idx_<%= tableName %>_<%= field.name %>_unique 
+ON <%= tableName %>(<%= field.name %>);
+<% 
+    } else if (['email', 'username', 'slug', 'code'].includes(field.name)) {
+-%>
+CREATE INDEX IF NOT EXISTS idx_<%= tableName %>_<%= field.name %> 
+ON <%= tableName %>(<%= field.name %>);
+<% 
+    }
+  });
+  
+  // Index timestamp columns for performance
+  if (entity.options?.timestamps !== false) {
+-%>
+CREATE INDEX IF NOT EXISTS idx_<%= tableName %>_created_at 
+ON <%= tableName %>(created_at DESC);
+<% 
+  }
+  
+  // Index soft delete column
+  if (entity.options?.softDelete) {
+-%>
+CREATE INDEX IF NOT EXISTS idx_<%= tableName %>_deleted_at 
+ON <%= tableName %>(deleted_at) WHERE deleted_at IS NULL;
+<% 
+  }
+  
+  // Index user ownership columns
+  if (variables.enableAuth) {
+    const userFields = ['user_id', 'owner_id', 'created_by'];
+    entity.fields.forEach(field => {
+      if (userFields.includes(field.name)) {
+-%>
+CREATE INDEX IF NOT EXISTS idx_<%= tableName %>_<%= field.name %> 
+ON <%= tableName %>(<%= field.name %>);
+<% 
+      }
+    });
+  }
+}); -%>
+
+-- Full-text search setup (optional)
+<% entities.forEach(entity => {
+  const tableName = entity.options?.tableName || utils.pluralize(entity.name.toLowerCase());
+  const textFields = entity.fields.filter(field => 
+    ['string', 'text'].includes(field.type) && 
+    ['title', 'name', 'description', 'content', 'body'].includes(field.name)
+  );
+  
+  if (textFields.length > 0) {
+-%>
+
+-- Full-text search for <%= entity.name %>
+ALTER TABLE <%= tableName %> ADD COLUMN IF NOT EXISTS search_vector tsvector;
+
+CREATE OR REPLACE FUNCTION update_<%= tableName %>_search_vector()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.search_vector := 
+<% textFields.forEach((field, index) => { -%>
+    <% if (index > 0) { %>|| ' ' || <% } %>to_tsvector('english', COALESCE(NEW.<%= field.name %>, ''))
+<% }); -%>;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER update_<%= tableName %>_search_vector_trigger
+  BEFORE INSERT OR UPDATE ON <%= tableName %>
+  FOR EACH ROW EXECUTE FUNCTION update_<%= tableName %>_search_vector();
+
+-- Index for full-text search
+CREATE INDEX IF NOT EXISTS idx_<%= tableName %>_search_vector 
+ON <%= tableName %> USING gin(search_vector);
+
+-- Update existing records
+UPDATE <%= tableName %> SET search_vector = 
+<% textFields.forEach((field, index) => { -%>
+  <% if (index > 0) { %>|| ' ' || <% } %>to_tsvector('english', COALESCE(<%= field.name %>, ''))
+<% }); -%>;
+
+<% 
+  }
+}); -%>
+
+-- Statistics and monitoring
+CREATE OR REPLACE VIEW database_stats AS
+SELECT 
+  schemaname,
+  tablename,
+  attname,
+  n_distinct,
+  most_common_vals,
+  most_common_freqs
+FROM pg_stats 
+WHERE schemaname = 'public'
+ORDER BY tablename, attname;
+
+-- Entity count view
+CREATE OR REPLACE VIEW entity_counts AS
+SELECT 
+<% entities.forEach((entity, index) => {
+  const tableName = entity.options?.tableName || utils.pluralize(entity.name.toLowerCase());
+  const isLast = index === entities.length - 1;
+-%>
+  (SELECT COUNT(*) FROM <%= tableName %><% if (entity.options?.softDelete) { %> WHERE deleted_at IS NULL<% } %>) AS <%= entity.name.toLowerCase() %>_count<%= isLast ? '' : ',' %>
+<% }); -%>;
+
+-- Migration completed successfully
+-- Generated by Brickend Framework
+-- Project: <%= project.name %>
+-- Entities: <%= entities.map(e => e.name).join(', ') %>
+-- Features: <% if (variables.enableAuth) { %>Auth, <% } %><% if (variables.enableRLS) { %>RLS, <% } %><% if (variables.enableRealtime) { %>Realtime, <% } %><% if (variables.enableStorage) { %>Storage, <% } %>CRUD
+-- Generated at: <%= timestamps.generatedISO %>

@@ -1,0 +1,69 @@
+{
+  "name": "@brickend/cli",
+  "version": "0.0.1",
+  "description": "CLI for Brickend Framework - Generate full-stack CRUD applications with TypeScript",
+  "bin": {
+    "brickend": "./dist/index.js"
+  },
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js",
+    "lint": "eslint src/**/*.ts",
+    "lint:fix": "eslint src/**/*.ts --fix",
+    "format": "prettier --write src/**/*.ts",
+    "type-check": "tsc --noEmit",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run clean && npm run build",
+    "test": "echo \"Tests will be added in future phases\"",
+    "cli:init": "node dist/index.js init",
+    "cli:generate": "node dist/index.js generate",
+    "cli:help": "node dist/index.js --help"
+  },
+  "keywords": [
+    "brickend",
+    "cli",
+    "framework",
+    "typescript",
+    "supabase",
+    "edge-functions",
+    "crud",
+    "generator",
+    "backend",
+    "api",
+    "full-stack"
+  ],
+  "author": "Brickend Team",
+  "engines": {
+    "node": ">=22"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "dependencies": {
+    "@brickend/core": "file:../../packages/framework/core",
+    "@brickend/supabase": "file:../../packages/modules/supabase",
+    "chalk": "^5.4.1",
+    "commander": "^14.0.0",
+    "fs-extra": "^11.3.0",
+    "inquirer": "^12.6.1",
+    "ora": "^8.2.0",
+    "pluralize": "^8.0.0"
+  },
+  "devDependencies": {
+    "@types/fs-extra": "^11.0.4",
+    "@types/inquirer": "^9.0.8",
+    "@types/node": "^22.15.18",
+    "@types/pluralize": "^0.0.33",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^9.27.0",
+    "prettier": "^3.0.0",
+    "typescript": "^5.8.3"
+  }
+}

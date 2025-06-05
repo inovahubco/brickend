@@ -1,0 +1,290 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "version": 2,
+  "name": "<%= project.name %>",
+  "description": "<%= project.description || `${project.displayName || project.name} - API built with Brickend Framework` %>",
+  
+  <% if (project.deployment?.regions) { %>
+  "regions": [<%= project.deployment.regions.map(r => `"${r}"`).join(', ') %>],
+  <% } else { %>
+  "regions": ["<%= project.deployment?.region || 'auto' %>"],
+  <% } %>
+
+  "buildCommand": "<%= project.deployment?.build?.buildCommand || 'echo \"No build step required for Edge Functions\"' %>",
+  "outputDirectory": "<%= project.deployment?.build?.outputDirectory || '.' %>",
+  "installCommand": "<%= project.deployment?.build?.installCommand || 'npm install' %>",
+
+  "functions": {
+    <% project.entities.forEach((entity, index) => { %>
+    "supabase/functions/<%= entity.kebabName %>/index.ts": {
+      "runtime": "<%= project.deployment?.functions?.runtime || 'edge' %>",
+      "regions": ["<%= project.deployment?.region || 'auto' %>"]<% if (project.deployment?.functions?.timeout) { %>,
+      "maxDuration": <%= project.deployment.functions.timeout %><% } %><% if (project.deployment?.functions?.memory) { %>,
+      "memory": <%= project.deployment.functions.memory %><% } %>
+    }<%= index < project.entities.length - 1 ? ',' : '' %>
+    <% }); %>
+  },
+
+  "rewrites": [
+    <% project.entities.forEach((entity, index) => { %>
+    {
+      "source": "/api/<%= entity.kebabName %>",
+      "destination": "/supabase/functions/<%= entity.kebabName %>"
+    },
+    {
+      "source": "/api/<%= entity.kebabName %>/(.*)",
+      "destination": "/supabase/functions/<%= entity.kebabName %>/index.ts"
+    }<%= index < project.entities.length - 1 ? ',' : '' %>
+    <% }); %><% if (project.api?.customRoutes && project.api.customRoutes.length > 0) { %>,
+    <% project.api.customRoutes.forEach((route, index) => { %>
+    {
+      "source": "<%= route.source %>",
+      "destination": "<%= route.destination %>"<% if (route.has) { %>,
+      "has": <%= JSON.stringify(route.has) %><% } %><% if (route.missing) { %>,
+      "missing": <%= JSON.stringify(route.missing) %><% } %>
+    }<%= index < project.api.customRoutes.length - 1 ? ',' : '' %>
+    <% }); %>
+    <% } %>
+  ],
+
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "<%= project.cors?.origin || '*' %>"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "<%= project.cors?.methods || 'GET, POST, PUT, PATCH, DELETE, OPTIONS' %>"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "<%= project.cors?.headers || 'Content-Type, Authorization, X-Requested-With' %>"
+        },
+        {
+          "key": "Access-Control-Max-Age",
+          "value": "<%= project.cors?.maxAge || '86400' %>"
+        }<% if (project.cors?.credentials) { %>,
+        {
+          "key": "Access-Control-Allow-Credentials",
+          "value": "true"
+        }<% } %>
+      ]
+    }<% if (project.security?.headers) { %>,
+    {
+      "source": "/(.*)",
+      "headers": [
+        <% if (project.security.headers.contentSecurityPolicy) { %>
+        {
+          "key": "Content-Security-Policy",
+          "value": "<%= project.security.headers.contentSecurityPolicy %>"
+        },
+        <% } %>
+        <% if (project.security.headers.frameOptions) { %>
+        {
+          "key": "X-Frame-Options",
+          "value": "<%= project.security.headers.frameOptions %>"
+        },
+        <% } %>
+        <% if (project.security.headers.contentTypeOptions) { %>
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        <% } %>
+        <% if (project.security.headers.xssProtection) { %>
+        {
+          "key": "X-XSS-Protection",
+          "value": "1; mode=block"
+        },
+        <% } %>
+        <% if (project.security.headers.referrerPolicy) { %>
+        {
+          "key": "Referrer-Policy",
+          "value": "<%= project.security.headers.referrerPolicy %>"
+        },
+        <% } %>
+        <% if (project.security.headers.strictTransportSecurity) { %>
+        {
+          "key": "Strict-Transport-Security",
+          "value": "<%= project.security.headers.strictTransportSecurity %>"
+        },
+        <% } %>
+        {
+          "key": "X-Powered-By",
+          "value": "Brickend Framework"
+        }
+      ]
+    }<% } %>
+  ],
+
+  <% if (project.features?.rateLimiting) { %>
+  "limits": {
+    "duration": <%= project.rateLimiting?.duration || 60000 %>,
+    "max": <%= project.rateLimiting?.max || 100 %>
+  },
+  <% } %>
+
+  "env": {
+    "SUPABASE_URL": "@supabase-url",
+    "SUPABASE_ANON_KEY": "@supabase-anon-key",
+    "SUPABASE_SERVICE_ROLE_KEY": "@supabase-service-role-key"<% if (project.features?.auth !== false) { %>,
+    "SUPABASE_JWT_SECRET": "@supabase-jwt-secret"<% } %><% if (project.deployment?.env) { %>,
+    <% Object.entries(project.deployment.env).forEach(([key, value], index, arr) => { %>
+    "<%= key %>": "@<%= key.toLowerCase().replace(/_/g, '-') %>"<%= index < arr.length - 1 ? ',' : '' %>
+    <% }); %>
+    <% } %>
+  },
+
+  "build": {
+    "env": {
+      "NODE_ENV": "<%= project.deployment?.environment || 'production' %>",
+      "API_VERSION": "<%= project.api?.version || 'v1' %>",
+      "BRICKEND_VERSION": "<%= brickend.version %>"<% if (project.build?.env) { %>,
+      <% Object.entries(project.build.env).forEach(([key, value], index, arr) => { %>
+      "<%= key %>": "<%= value %>"<%= index < arr.length - 1 ? ',' : '' %>
+      <% }); %>
+      <% } %>
+    }
+  },
+
+  <% if (project.redirects && project.redirects.length > 0) { %>
+  "redirects": [
+    <% project.redirects.forEach((redirect, index) => { %>
+    {
+      "source": "<%= redirect.source %>",
+      "destination": "<%= redirect.destination %>",
+      "permanent": <%= redirect.permanent || false %><% if (redirect.statusCode) { %>,
+      "statusCode": <%= redirect.statusCode %><% } %>
+    }<%= index < project.redirects.length - 1 ? ',' : '' %>
+    <% }); %>
+  ],
+  <% } %>
+
+  <% if (project.cleanUrls !== false) { %>
+  "cleanUrls": true,
+  <% } %>
+
+  <% if (project.trailingSlash === true) { %>
+  "trailingSlash": true,
+  <% } else if (project.trailingSlash === false) { %>
+  "trailingSlash": false,
+  <% } %>
+
+  "framework": {
+    "name": "brickend",
+    "version": "<%= brickend.version %>"
+  },
+
+  <% if (project.crons && project.crons.length > 0) { %>
+  "crons": [
+    <% project.crons.forEach((cron, index) => { %>
+    {
+      "path": "<%= cron.path %>",
+      "schedule": "<%= cron.schedule %>"<% if (cron.timezone) { %>,
+      "timezone": "<%= cron.timezone %>"<% } %>
+    }<%= index < project.crons.length - 1 ? ',' : '' %>
+    <% }); %>
+  ],
+  <% } %>
+
+  <% if (project.deployment?.customDomains && project.deployment.customDomains.length > 0) { %>
+  "alias": [
+    <% project.deployment.customDomains.forEach((domain, index) => { %>
+    "<%= domain %>"<%= index < project.deployment.customDomains.length - 1 ? ',' : '' %>
+    <% }); %>
+  ],
+  <% } %>
+
+  "github": {
+    "enabled": true,
+    "autoAlias": <%= project.github?.autoAlias !== false %><% if (project.github?.deploymentProtection) { %>,
+    "deploymentProtection": {
+      "enabled": true,
+      "protectedBranches": ["main", "production"]
+    }<% } %>
+  },
+
+  <% if (project.features?.monitoring) { %>
+  "analytics": {
+    "enabled": true
+  },
+  "speedInsights": {
+    "enabled": true
+  },
+  <% } %>
+
+  "git": {
+    "deploymentEnabled": {
+      "main": true<% if (project.git?.deploymentBranches) { %>,
+      <% project.git.deploymentBranches.forEach(branch => { %>
+      "<%= branch %>": true,
+      <% }); %>
+      <% } %>
+    }
+  },
+
+  <% if (project.deployment?.buildCaching !== false) { %>
+  "buildCaching": {
+    "enabled": true
+  },
+  <% } %>
+
+  <% if (project.deployment?.edgeFunctions) { %>
+  "middleware": {
+    "matcher": [
+      <% if (project.deployment.edgeFunctions.auth) { %>
+      "/api/auth/:path*",
+      <% } %>
+      <% if (project.deployment.edgeFunctions.cors) { %>
+      "/api/:path*",
+      <% } %>
+      <% if (project.deployment.edgeFunctions.rateLimit) { %>
+      "/api/:path*"
+      <% } %>
+    ]
+  },
+  <% } %>
+
+  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- <%= project.entities.map(e => `supabase/functions/${e.kebabName}`).join(' ') %> || exit 1",
+
+  <% if (project.deployment?.customConfig) { %>
+  <% Object.entries(project.deployment.customConfig).forEach(([key, value], index, arr) => { %>
+  "<%= key %>": <%= JSON.stringify(value) %><%= index < arr.length - 1 ? ',' : '' %>
+  <% }); %>
+  <% } %>
+
+  "functions": {
+    <% project.entities.forEach((entity, index) => { %>
+    "supabase/functions/<%= entity.kebabName %>/index.ts": {
+      "runtime": "edge",
+      "regions": ["<%= project.deployment?.region || 'auto' %>"],
+      "environment": {
+        "FUNCTION_NAME": "<%= entity.kebabName %>",
+        "ENTITY_NAME": "<%= entity.name %>",
+        "TABLE_NAME": "<%= entity.tableName %>"<% if (entity.requiresAuth !== false) { %>,
+        "REQUIRES_AUTH": "true"<% } %><% if (entity.hasSoftDelete) { %>,
+        "SOFT_DELETE": "true"<% } %><% if (entity.hasOwnership) { %>,
+        "OWNERSHIP_CHECK": "true"<% } %>
+      }
+    }<%= index < project.entities.length - 1 ? ',' : '' %>
+    <% }); %>
+  },
+
+  "routes": [
+    <% project.entities.forEach((entity, index) => { %>
+    {
+      "src": "/api/<%= entity.kebabName %>",
+      "dest": "/supabase/functions/<%= entity.kebabName %>/index.ts",
+      "methods": ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    },
+    {
+      "src": "/api/<%= entity.kebabName %>/([^/]+)",
+      "dest": "/supabase/functions/<%= entity.kebabName %>/index.ts?id=$1",
+      "methods": ["GET", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    }<%= index < project.entities.length - 1 ? ',' : '' %>
+    <% }); %>
+  ]
+}
