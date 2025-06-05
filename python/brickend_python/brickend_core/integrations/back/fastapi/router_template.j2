@@ -1,0 +1,57 @@
+{#
+  router_template.j2
+
+  Generates FastAPI router for each entity.
+  Uses:
+    - entity.names.snake / pascal / kebab
+    - CRUD functions from crud_template.j2
+#}
+
+{% for entity in entities %}
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from brickend_core.integrations.back.fastapi.crud import (
+    get_{{ entity.names.snake }},
+    create_{{ entity.names.snake }},
+    get_{{ entity.names.snake }}_list,
+    update_{{ entity.names.snake }},
+    delete_{{ entity.names.snake }},
+)
+from brickend_core.integrations.back.fastapi.schemas import {{ entity.names.pascal }}Create, {{ entity.names.pascal }}Read
+from brickend_core.integrations.back.fastapi.db import get_db
+
+router = APIRouter(
+    prefix="/{{ entity.names.kebab }}s",
+    tags=["{{ entity.names.pascal }}"]
+)
+
+@router.get("/", response_model=list[{{ entity.names.pascal }}Read])
+def read_{{ entity.names.snake }}_list(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    return get_{{ entity.names.snake }}_list(db, skip=skip, limit=limit)
+
+@router.get("/{id}", response_model={{ entity.names.pascal }}Read)
+def read_{{ entity.names.snake }}(id: {{ entity.fields[0].sql_type }}, db: Session = Depends(get_db)):
+    db_obj = get_{{ entity.names.snake }}(db, id)
+    if not db_obj:
+        raise HTTPException(status_code=404, detail="{{ entity.names.pascal }} not found")
+    return db_obj
+
+@router.post("/", response_model={{ entity.names.pascal }}Read)
+def create_{{ entity.names.snake }}(obj_in: {{ entity.names.pascal }}Create, db: Session = Depends(get_db)):
+    return create_{{ entity.names.snake }}(db, obj_in)
+
+@router.put("/{id}", response_model={{ entity.names.pascal }}Read)
+def update_{{ entity.names.snake }}(id: {{ entity.fields[0].sql_type }}, obj_in: {{ entity.names.pascal }}Create, db: Session = Depends(get_db)):
+    updated = update_{{ entity.names.snake }}(db, id, obj_in)
+    if not updated:
+        raise HTTPException(status_code=404, detail="{{ entity.names.pascal }} not found")
+    return updated
+
+@router.delete("/{id}", response_model={{ entity.names.pascal }}Read)
+def delete_{{ entity.names.snake }}(id: {{ entity.fields[0].sql_type }}, db: Session = Depends(get_db)):
+    deleted = delete_{{ entity.names.snake }}(db, id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="{{ entity.names.pascal }} not found")
+    return deleted
+
+{% endfor %}

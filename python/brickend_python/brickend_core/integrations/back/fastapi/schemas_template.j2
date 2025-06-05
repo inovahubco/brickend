@@ -1,0 +1,26 @@
+{#
+  schemas_template.j2
+
+  Generates Pydantic models (schemas) for FastAPI validation.
+  Uses:
+    - entity.names.pascal as class name
+    - entity.fields[*].names.snake and entity.fields[*].type for type hints
+#}
+
+{% for entity in entities %}
+from pydantic import BaseModel
+from typing import Optional
+
+class {{ entity.names.pascal }}Base(BaseModel):
+    {% for field in entity.fields -%}
+    {{ field.names.snake }}: {{ field.type | capitalize }}{% if field.is_nullable %} = None{% endif %}
+    {% endfor %}
+
+class {{ entity.names.pascal }}Create({{ entity.names.pascal }}Base):
+    pass
+
+class {{ entity.names.pascal }}Read({{ entity.names.pascal }}Base):
+    class Config:
+        orm_mode = True
+
+{% endfor %}

@@ -1,0 +1,22 @@
+{#
+  main_template.j2
+
+  Generates a FastAPI 'main.py'
+#}
+
+from fastapi import FastAPI
+
+{% for entity in entities %}
+from brickend_core.integrations.back.fastapi.router import router as {{ entity.names.snake }}_router
+{% endfor %}
+
+app = FastAPI(
+    title="{{ project_name | default('FastAPI App') }}",
+    version="{{ project_version | default('0.1.0') }}"
+)
+
+{% for entity in entities %}
+app.include_router({{ entity.names.snake }}_router)
+{% endfor %}
+
+# You can add additional startup/shutdown events or middleware here

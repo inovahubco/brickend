@@ -1,0 +1,25 @@
+{#
+  db_template.j2
+
+  Generates database configuration using SQLAlchemy.
+  Uses:
+    - database_url
+#}
+
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
+SQLALCHEMY_DATABASE_URL = "{{ database_url }}"
+
+engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={{ connect_args | default("dict()") }})
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+def get_db():
+    """
+    Dependency for FastAPI endpoints: yield a database session.
+    """
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()

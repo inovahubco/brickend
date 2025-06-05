@@ -1,0 +1,29 @@
+{#
+  models_template.j2
+
+  Generates SQLAlchemy model classes for each entity.
+  Uses:
+    - entity.names.snake as __tablename__
+    - entity.names.pascal as class name
+    - entity.fields[*].names.snake and entity.fields[*].sql_type for columns
+#}
+
+from sqlalchemy import Column, {{ entity.fields | map(attribute="sql_type") | unique | join(", ") }}
+from sqlalchemy.ext.declarative import declarative_base
+
+Base = declarative_base()
+
+{% for entity in entities %}
+class {{ entity.names.pascal }}(Base):
+    __tablename__ = "{{ entity.names.snake }}"
+
+    {% for field in entity.fields -%}
+    {{ field.names.snake }} = Column(
+        {{ field.sql_type }}
+        {% if field.is_primary_key %}, primary_key=True{% endif %}
+        {% if not field.is_nullable %}, nullable=False{% endif %}
+        {% if field.is_unique %}, unique=True{% endif %}
+    )
+    {% endfor %}
+
+{% endfor %}
