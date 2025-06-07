@@ -1,5 +1,5 @@
 """
-init_command.py
+init_project.py
 """
 
 import shutil
@@ -30,7 +30,7 @@ def find_project_root() -> Path:
     raise FileNotFoundError("Could not find project root with 'templates/skeletons' directory")
 
 
-@app.command("init")
+@app.command("project")
 def init_project(
     name: str = typer.Argument(..., help="Name of the new Brickend project"),
     project_type: str = typer.Option(

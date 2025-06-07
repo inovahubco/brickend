@@ -1,7 +1,7 @@
 """
 test_add_entity.py
 
-Unit tests for the 'add_entity' CLI command in cli.commands.add_entity.
+Unit tests for the 'add_entity entity' CLI command in cli.commands.add_entity.
 Covers:
   1. Adding a single entity to an empty entities.yaml.
   2. Adding a second entity with a foreign key to an existing entity.
@@ -12,7 +12,7 @@ from pathlib import Path
 from typer.testing import CliRunner
 import ruamel.yaml
 
-from brickend_cli.commands.add_entity import app as add_entity_app
+from brickend_cli.main import app as cli_app
 
 
 def write_empty_entities_yaml(path: Path) -> None:
@@ -75,8 +75,8 @@ def test_add_single_entity(monkeypatch):
 
     monkeypatch.setattr("typer.prompt", fake_prompt)
 
-    result = runner.invoke(add_entity_app, [])
-    assert result.exit_code == 0
+    result = runner.invoke(cli_app, ["add_entity", "entity"])
+    assert result.exit_code == 0, f"CLI failed: {result.stdout}\n{result.stderr}"
 
     yaml = ruamel.yaml.YAML()
     entities_file = Path("entities.yaml")
@@ -152,8 +152,8 @@ def test_add_second_entity_with_foreign_key(monkeypatch):
         return next(inputs1)
 
     monkeypatch.setattr("typer.prompt", fake_prompt1)
-    result1 = runner.invoke(add_entity_app, [])
-    assert result1.exit_code == 0
+    result1 = runner.invoke(cli_app, ["add_entity", "entity"])
+    assert result1.exit_code == 0, f"First CLI call failed: {result1.stdout}\n{result1.stderr}"
 
     inputs2 = iter([
         "Post",   # Entity name
@@ -190,8 +190,8 @@ def test_add_second_entity_with_foreign_key(monkeypatch):
         return next(inputs2)
 
     monkeypatch.setattr("typer.prompt", fake_prompt2)
-    result2 = runner.invoke(add_entity_app, [])
-    assert result2.exit_code == 0
+    result2 = runner.invoke(cli_app, ["add_entity", "entity"])
+    assert result2.exit_code == 0, f"Second CLI call failed: {result2.stdout}\n{result2.stderr}"
 
     # Load and verify entities.yaml
     yaml = ruamel.yaml.YAML()

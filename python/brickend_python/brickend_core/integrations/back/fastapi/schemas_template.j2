@@ -8,7 +8,7 @@
 #}
 
 {% for entity in entities %}
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 
 class {{ entity.names.pascal }}Base(BaseModel):

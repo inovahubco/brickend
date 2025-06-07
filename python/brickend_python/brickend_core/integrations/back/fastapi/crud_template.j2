@@ -1,19 +1,17 @@
-{#
-  crud_template.j2
+{# crud_template.j2
+   Generates `app/crud/{{ entity.names.snake }}_crud.py` #}
 
-  Generates basic CRUD functions for each entity.
-  Uses:
-    - entity.names.snake / entity.names.pascal
-    - entity.fields[0] as primary key field for function parameters
-#}
-
-{% for entity in entities %}
 from sqlalchemy.orm import Session
-from brickend_core.integrations.back.fastapi.models import {{ entity.names.pascal }}
-from brickend_core.integrations.back.fastapi.schemas import {{ entity.names.pascal }}Create, {{ entity.names.pascal }}Read
+from app.models.{{ entity.names.snake }} import {{ entity.names.pascal }}
+from app.schemas.{{ entity.names.snake }} import {{ entity.names.pascal }}Create
 
 def get_{{ entity.names.snake }}(db: Session, id: {{ entity.fields[0].sql_type }}):
-    return db.query({{ entity.names.pascal }}).filter({{ entity.names.pascal }}.{{ entity.fields[0].names.snake }} == id).first()
+    return db.query({{ entity.names.pascal }}).filter(
+        {{ entity.names.pascal }}.{{ entity.fields[0].names.snake }} == id
+    ).first()
+
+def get_{{ entity.names.snake }}_list(db: Session, skip: int = 0, limit: int = 100):
+    return db.query({{ entity.names.pascal }}).offset(skip).limit(limit).all()
 
 def create_{{ entity.names.snake }}(db: Session, obj_in: {{ entity.names.pascal }}Create):
     db_obj = {{ entity.names.pascal }}(**obj_in.dict())
@@ -22,18 +20,10 @@ def create_{{ entity.names.snake }}(db: Session, obj_in: {{ entity.names.pascal 
     db.refresh(db_obj)
     return db_obj
 
-def get_{{ entity.names.snake }}_list(db: Session, skip: int = 0, limit: int = 100):
-    return db.query({{ entity.names.pascal }}).offset(skip).limit(limit).all()
-
-def delete_{{ entity.names.snake }}(db: Session, id: {{ entity.fields[0].sql_type }}):
-    obj = db.query({{ entity.names.pascal }}).filter({{ entity.names.pascal }}.{{ entity.fields[0].names.snake }} == id).first()
-    if obj:
-        db.delete(obj)
-        db.commit()
-    return obj
-
-def update_{{ entity.names.snake }}(db: Session, id: {{ entity.fields[0].sql_type }}, obj_in: {{ entity.names.pascal }}Create):
-    db_obj = db.query({{ entity.names.pascal }}).filter({{ entity.names.pascal }}.{{ entity.fields[0].names.snake }} == id).first()
+def update_{{ entity.names.snake }}(
+    db: Session, id: {{ entity.fields[0].sql_type }}, obj_in: {{ entity.names.pascal }}Create
+):
+    db_obj = get_{{ entity.names.snake }}(db, id)
     if not db_obj:
         return None
     for field, value in obj_in.dict().items():
@@ -43,4 +33,9 @@ def update_{{ entity.names.snake }}(db: Session, id: {{ entity.fields[0].sql_typ
     db.refresh(db_obj)
     return db_obj
 
-{% endfor %}
+def delete_{{ entity.names.snake }}(db: Session, id: {{ entity.fields[0].sql_type }}):
+    obj = get_{{ entity.names.snake }}(db, id)
+    if obj:
+        db.delete(obj)
+        db.commit()
+    return obj

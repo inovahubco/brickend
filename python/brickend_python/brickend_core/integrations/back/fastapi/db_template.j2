@@ -1,22 +1,31 @@
-{#
-  db_template.j2
+{# db_template.j2
 
-  Generates database configuration using SQLAlchemy.
-  Uses:
-    - database_url
+   Generates `app/database.py` with SQLAlchemy engine, SessionLocal y Base.
+   Usa StaticPool automáticamente cuando la URL es ":memory:".
 #}
 
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, declarative_base
+{% if "memory" in database_url %}
+from sqlalchemy.pool import StaticPool
+{% endif %}
 
 SQLALCHEMY_DATABASE_URL = "{{ database_url }}"
 
-engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={{ connect_args | default("dict()") }})
+engine = create_engine(
+    SQLALCHEMY_DATABASE_URL,
+    connect_args={"check_same_thread": False},
+    {% if "memory" in database_url -%}
+    poolclass=StaticPool,
+    {% endif -%}
+)
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
 
 def get_db():
     """
-    Dependency for FastAPI endpoints: yield a database session.
+    Dependency for FastAPI endpoints: yields a database session.
     """
     db = SessionLocal()
     try:

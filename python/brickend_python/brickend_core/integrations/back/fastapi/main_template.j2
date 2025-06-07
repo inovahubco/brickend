@@ -1,13 +1,11 @@
-{#
-  main_template.j2
-
-  Generates a FastAPI 'main.py'
-#}
+{# main_template.j2
+   Generates `app/main.py` mounting all routers from `app/routers` #}
 
 from fastapi import FastAPI
+from app.database import engine, Base
 
 {% for entity in entities %}
-from brickend_core.integrations.back.fastapi.router import router as {{ entity.names.snake }}_router
+from app.routers.{{ entity.names.snake }}_router import router as {{ entity.names.snake }}_router
 {% endfor %}
 
 app = FastAPI(
@@ -16,7 +14,21 @@ app = FastAPI(
 )
 
 {% for entity in entities %}
-app.include_router({{ entity.names.snake }}_router)
+app.include_router(
+    {{ entity.names.snake }}_router,
+    prefix="/{{ entity.names.kebab }}s",
+    tags=["{{ entity.names.pascal }}"]
+)
 {% endfor %}
 
-# You can add additional startup/shutdown events or middleware here
+@app.on_event("startup")
+def on_startup():
+    """
+    Create all tables in the database on startup.
+    """
+    Base.metadata.create_all(bind=engine)
+
+
+@app.get("/", tags=["root"])
+def read_root():
+    return {"message": "Welcome to {{ project_name | default('your app') }}!"}

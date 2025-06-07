@@ -1,7 +1,7 @@
 """
-test_init_command.py
+test_init_project.py
 
-Unit tests for the 'init' CLI command in cli.commands.init_command.
+Unit tests for the 'init project' CLI command in cli.commands.init_command.
 Covers:
   1. Successful initialization of a fastapi skeleton.
   2. Error when target folder already exists.
@@ -12,7 +12,7 @@ import pytest
 from pathlib import Path
 from typer.testing import CliRunner
 
-from brickend_cli.commands.init_command import app as init_app
+from brickend_cli.main import app as cli_app
 
 
 @pytest.fixture(autouse=True)
@@ -50,8 +50,8 @@ def test_init_project_success(tmp_path):
         (project_root / "templates" / "skeletons" / "fastapi" / "README.md").write_text("# README", encoding="utf-8")
         (project_root / "templates" / "skeletons" / "fastapi" / "templates_user").mkdir(parents=True, exist_ok=True)
 
-        result = runner.invoke(init_app, ["demo_app", "--type", "fastapi"])
-        assert result.exit_code == 0, f"CLI failed: {result.stdout}"
+        result = runner.invoke(cli_app, ["init", "project", "demo_app", "--type", "fastapi"])
+        assert result.exit_code == 0, f"CLI failed: {result.stdout}\n{result.stderr}"
         assert "✅ Project 'demo_app' created using skeleton 'fastapi'." in result.stdout
 
         demo_dir = Path("demo_app")
@@ -78,7 +78,8 @@ def test_init_project_folder_exists(tmp_path):
         (project_root / "templates" / "skeletons" / "fastapi" / "app").mkdir(parents=True, exist_ok=True)
         (project_root / "templates" / "skeletons" / "fastapi" / "app" / "__init__.py").write_text("", encoding="utf-8")
         Path("existing_app").mkdir()
-        result = runner.invoke(init_app, ["existing_app", "--type", "fastapi"])
+
+        result = runner.invoke(cli_app, ["init", "project", "existing_app", "--type", "fastapi"])
         assert result.exit_code != 0
         assert "Error: The folder 'existing_app' already exists." in result.stdout
 
@@ -94,6 +95,6 @@ def test_init_project_invalid_type(tmp_path):
         (project_root / "templates" / "skeletons" / "fastapi" / "app").mkdir(parents=True, exist_ok=True)
         (project_root / "templates" / "skeletons" / "fastapi" / "app" / "__init__.py").write_text("", encoding="utf-8")
 
-        result = runner.invoke(init_app, ["new_app", "--type", "invalid_type"])
+        result = runner.invoke(cli_app, ["init", "project", "new_app", "--type", "invalid_type"])
         assert result.exit_code != 0
         assert "Error: No skeleton found for type 'invalid_type'." in result.stdout

@@ -103,7 +103,7 @@ def prompt_field_definitions(num_fields: int) -> List[Dict[str, Any]]:
     return fields
 
 
-@app.command("add_entity")
+@app.command("entity")
 def add_entity() -> None:
     """
     Prompt the user to add a new entity to 'entities.yaml' in the current directory.

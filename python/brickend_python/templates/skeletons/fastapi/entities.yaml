@@ -1,0 +1,21 @@
+# entities:
+#   - name: User
+#     fields:
+#       - name: id
+#         type: uuid
+#         primary_key: true
+#         unique: true
+#         nullable: false
+#       - name: email
+#         type: string
+#         primary_key: false
+#         unique: true
+#         nullable: false
+#       - name: full_name
+#         type: string
+#         primary_key: false
+#         unique: false
+#         nullable: false
+
+# Empty list by default: use the `brickend add_entity entity` command to add entities
+entities: []
