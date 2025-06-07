@@ -2,10 +2,6 @@
   models_template.j2
 
   Generates SQLAlchemy model classes for each entity.
-  Uses:
-    - entity.names.snake as __tablename__
-    - entity.names.pascal as class name
-    - entity.fields[*].names.snake and entity.fields[*].sql_type for columns
 #}
 
 {# Collect all SQL types from all entities and fields #}
@@ -17,7 +13,7 @@
 {% endfor %}
 
 from sqlalchemy import Column, {{ all_sql_types | unique | join(", ") }}
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 
 Base = declarative_base()
 
