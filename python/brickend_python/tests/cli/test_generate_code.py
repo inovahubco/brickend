@@ -3,7 +3,7 @@ test_generate_code.py
 
 Integration tests for the 'generate code' CLI command in cli.commands.generate_code.
 Updated to match the new file structure where CRUD and Router files are generated
-per-entity in app/crud/ and app/routers/ directories.
+per-entity in app/crud/ and app/routers/ directories, and single files live under app/.
 """
 
 import pytest
@@ -84,8 +84,8 @@ def test_generate_code_success(tmp_path):
     Given a valid entities.yaml and the default 'fastapi' integration,
     the CLI should generate code files successfully under the specified output directory.
 
-    Expected structure:
-    - Root files: models.py, schemas.py, main.py, db.py
+    Expected structure under app/:
+    - models.py, schemas.py, main.py, database.py
     - Per-entity files: app/crud/{entity}_crud.py, app/routers/{entity}_router.py
     """
     runner = CliRunner()
@@ -111,19 +111,11 @@ def test_generate_code_success(tmp_path):
     assert result.exit_code == 0, f"CLI failed unexpectedly: {result.stdout}\n{result.stderr}"
     assert "✅ Code generated successfully" in result.stdout
 
-    # Check root files (database.py might be the actual filename)
-    expected_root_files = [
-        "models.py",
-        "schemas.py",
-        "main.py",
-    ]
-    for f_name in expected_root_files:
-        file_path = output_dir / f_name
-        assert file_path.exists(), f"Expected {f_name} to be generated in root."
-
-    # Check for database file (could be db.py or database.py)
-    db_exists = (output_dir / "db.py").exists() or (output_dir / "database.py").exists()
-    assert db_exists, "Expected either db.py or database.py to be generated."
+    # Verify single files generated under app/
+    expected_app_files = ["models.py", "schemas.py", "main.py", "database.py"]
+    for fname in expected_app_files:
+        path = output_dir / "app" / fname
+        assert path.exists(), f"Expected app/{fname} to be generated."
 
     # Check per-entity files for User
     user_crud_path = output_dir / "app" / "crud" / "user_crud.py"
@@ -132,13 +124,18 @@ def test_generate_code_success(tmp_path):
     assert user_crud_path.exists(), "Expected app/crud/user_crud.py to be generated."
     assert user_router_path.exists(), "Expected app/routers/user_router.py to be generated."
 
-    # Verify content
-    models_content = (output_dir / "models.py").read_text(encoding="utf-8")
+    # Verify content in models.py
+    models_content = (output_dir / "app" / "models.py").read_text(encoding="utf-8")
     assert "class User(Base):" in models_content, "User model should be in models.py"
 
+    # Verify content in CRUD
     crud_content = user_crud_path.read_text(encoding="utf-8")
     assert "def get_user(" in crud_content, "get_user function should be in user_crud.py"
-    assert "from app.models.user import User" in crud_content, "User import should be in user_crud.py"
+    # import line may be 'from app.models import User'
+    assert (
+        "from app.models import User" in crud_content
+        or "from app.models.user import User" in crud_content
+    ), "User import should be in user_crud.py"
 
 
 def test_generate_code_multiple_entities(tmp_path):
@@ -167,19 +164,13 @@ def test_generate_code_multiple_entities(tmp_path):
 
     assert result.exit_code == 0, f"CLI failed: {result.stdout}\n{result.stderr}"
 
-    # Check that both entities get their own files
-    user_crud = output_dir / "app" / "crud" / "user_crud.py"
-    post_crud = output_dir / "app" / "crud" / "post_crud.py"
-    user_router = output_dir / "app" / "routers" / "user_router.py"
-    post_router = output_dir / "app" / "routers" / "post_router.py"
+    # Check per-entity CRUD and Router files
+    for entity in ("user", "post"):
+        assert (output_dir / "app" / "crud" / f"{entity}_crud.py").exists(), f"{entity}_crud.py should be generated"
+        assert (output_dir / "app" / "routers" / f"{entity}_router.py").exists(), f"{entity}_router.py should be generated"
 
-    assert user_crud.exists(), "user_crud.py should be generated"
-    assert post_crud.exists(), "post_crud.py should be generated"
-    assert user_router.exists(), "user_router.py should be generated"
-    assert post_router.exists(), "post_router.py should be generated"
-
-    # Verify main.py imports both routers
-    main_content = (output_dir / "main.py").read_text(encoding="utf-8")
+    # Verify app/main.py imports both routers
+    main_content = (output_dir / "app" / "main.py").read_text(encoding="utf-8")
     assert "user_router" in main_content, "main.py should import user_router"
     assert "post_router" in main_content, "main.py should import post_router"
 
@@ -304,21 +295,23 @@ def test_generate_code_content_validation(tmp_path):
 
     assert result.exit_code == 0
 
-    # Validate models.py
-    models_content = (output_dir / "models.py").read_text(encoding="utf-8")
+    # Validate models.py and schemas.py inside app/
+    models_content = (output_dir / "app" / "models.py").read_text(encoding="utf-8")
     assert "from sqlalchemy import Column" in models_content
     assert "class User(Base):" in models_content
     assert "__tablename__ = \"user\"" in models_content
 
-    # Validate schemas.py
-    schemas_content = (output_dir / "schemas.py").read_text(encoding="utf-8")
+    schemas_content = (output_dir / "app" / "schemas.py").read_text(encoding="utf-8")
     assert "from pydantic import BaseModel" in schemas_content
     assert "class UserBase(BaseModel):" in schemas_content
 
     # Validate user_crud.py
     crud_content = (output_dir / "app" / "crud" / "user_crud.py").read_text(encoding="utf-8")
     assert "from sqlalchemy.orm import Session" in crud_content
-    assert "from app.models.user import User" in crud_content
+    assert (
+        "from app.models import User" in crud_content
+        or "from app.models.user import User" in crud_content
+    )
     assert "def get_user(" in crud_content
     assert "def create_user(" in crud_content
 
@@ -328,22 +321,15 @@ def test_generate_code_content_validation(tmp_path):
     assert "from app.crud.user_crud import" in router_content
     assert "router = APIRouter(" in router_content
 
-    # Validate main.py
-    main_content = (output_dir / "main.py").read_text(encoding="utf-8")
+    # Validate main.py inside app/
+    main_content = (output_dir / "app" / "main.py").read_text(encoding="utf-8")
     assert "from fastapi import FastAPI" in main_content
     assert "from app.routers.user_router import router as user_router" in main_content
-    # Check for include_router pattern (could be with different formatting)
     assert "include_router(" in main_content and "user_router" in main_content
 
-    # Validate database.py (might be database.py instead of db.py based on template)
-    db_files = [output_dir / "db.py", output_dir / "database.py"]
-    db_file = None
-    for possible_db in db_files:
-        if possible_db.exists():
-            db_file = possible_db
-            break
-
-    assert db_file is not None, f"Neither db.py nor database.py found. Files: {list(output_dir.glob('*.py'))}"
+    # Validate database.py inside app/
+    db_file = output_dir / "app" / "database.py"
+    assert db_file.exists(), f"Expected app/database.py to be generated. Files: {list(output_dir.glob('*.py'))}"
 
     db_content = db_file.read_text(encoding="utf-8")
     assert "from sqlalchemy import create_engine" in db_content

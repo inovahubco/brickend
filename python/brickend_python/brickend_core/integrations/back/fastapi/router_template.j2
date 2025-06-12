@@ -12,20 +12,23 @@ from app.crud.{{ entity.names.snake }}_crud import (
     update_{{ entity.names.snake }},
     delete_{{ entity.names.snake }},
 )
-from app.schemas.{{ entity.names.snake }} import (
+from app.schemas import (
     {{ entity.names.pascal }}Create,
     {{ entity.names.pascal }}Read,
 )
 from app.database import get_db
+{% set first_field = entity.fields[0] %}
+{% if first_field.type == 'uuid' %}from uuid import UUID
+{% elif first_field.type == 'datetime' %}from datetime import datetime
+{% endif %}
 
 router = APIRouter(
-    prefix="/{{ entity.names.kebab }}s",
     tags=["{{ entity.names.pascal }}"]
 )
 
 
 @router.get("/", response_model=list[{{ entity.names.pascal }}Read])
-def read_{{ entity.names.snake }}_list(
+def read_{{ entity.names.snake }}_list_endpoint(
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
@@ -34,8 +37,8 @@ def read_{{ entity.names.snake }}_list(
 
 
 @router.get("/{id}", response_model={{ entity.names.pascal }}Read)
-def read_{{ entity.names.snake }}(
-    id: {{ entity.fields[0].sql_type }},
+def read_{{ entity.names.snake }}_endpoint(
+    id: {% if first_field.type == 'uuid' %}UUID{% elif first_field.type == 'string' %}str{% elif first_field.type == 'text' %}str{% elif first_field.type == 'integer' %}int{% elif first_field.type == 'float' %}float{% elif first_field.type == 'boolean' %}bool{% elif first_field.type == 'datetime' %}datetime{% else %}str{% endif %},
     db: Session = Depends(get_db),
 ):
     obj = get_{{ entity.names.snake }}(db, id)
@@ -45,7 +48,7 @@ def read_{{ entity.names.snake }}(
 
 
 @router.post("/", response_model={{ entity.names.pascal }}Read)
-def create_{{ entity.names.snake }}(
+def create_{{ entity.names.snake }}_endpoint(
     obj_in: {{ entity.names.pascal }}Create,
     db: Session = Depends(get_db),
 ):
@@ -53,8 +56,8 @@ def create_{{ entity.names.snake }}(
 
 
 @router.put("/{id}", response_model={{ entity.names.pascal }}Read)
-def update_{{ entity.names.snake }}(
-    id: {{ entity.fields[0].sql_type }},
+def update_{{ entity.names.snake }}_endpoint(
+    id: {% if first_field.type == 'uuid' %}UUID{% elif first_field.type == 'string' %}str{% elif first_field.type == 'text' %}str{% elif first_field.type == 'integer' %}int{% elif first_field.type == 'float' %}float{% elif first_field.type == 'boolean' %}bool{% elif first_field.type == 'datetime' %}datetime{% else %}str{% endif %},
     obj_in: {{ entity.names.pascal }}Create,
     db: Session = Depends(get_db),
 ):
@@ -65,8 +68,8 @@ def update_{{ entity.names.snake }}(
 
 
 @router.delete("/{id}", response_model={{ entity.names.pascal }}Read)
-def delete_{{ entity.names.snake }}(
-    id: {{ entity.fields[0].sql_type }},
+def delete_{{ entity.names.snake }}_endpoint(
+    id: {% if first_field.type == 'uuid' %}UUID{% elif first_field.type == 'string' %}str{% elif first_field.type == 'text' %}str{% elif first_field.type == 'integer' %}int{% elif first_field.type == 'float' %}float{% elif first_field.type == 'boolean' %}bool{% elif first_field.type == 'datetime' %}datetime{% else %}str{% endif %},
     db: Session = Depends(get_db),
 ):
     deleted = delete_{{ entity.names.snake }}(db, id)

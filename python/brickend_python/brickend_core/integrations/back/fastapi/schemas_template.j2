@@ -4,23 +4,32 @@
   Generates Pydantic models (schemas) for FastAPI validation.
   Uses:
     - entity.names.pascal as class name
-    - entity.fields[*].names.snake and entity.fields[*].type for type hints
+    - entity.fields[*].names.snake and proper Python types for type hints
 #}
 
-{% for entity in entities %}
 from pydantic import BaseModel, ConfigDict
 from typing import Optional
+from uuid import UUID
+from datetime import datetime
 
+{% for entity in entities %}
 class {{ entity.names.pascal }}Base(BaseModel):
     {% for field in entity.fields -%}
-    {{ field.names.snake }}: {{ field.type | capitalize }}{% if field.is_nullable %} = None{% endif %}
+    {% if not field.is_primary_key -%}
+    {{ field.names.snake }}: {% if field.type == 'uuid' %}UUID{% elif field.type == 'string' %}str{% elif field.type == 'text' %}str{% elif field.type == 'integer' %}int{% elif field.type == 'float' %}float{% elif field.type == 'boolean' %}bool{% elif field.type == 'datetime' %}datetime{% else %}str{% endif %}{% if field.is_nullable %} | None = None{% endif %}
+    {% endif -%}
     {% endfor %}
 
 class {{ entity.names.pascal }}Create({{ entity.names.pascal }}Base):
     pass
 
 class {{ entity.names.pascal }}Read({{ entity.names.pascal }}Base):
-    class Config:
-        orm_mode = True
+    {% for field in entity.fields -%}
+    {% if field.is_primary_key -%}
+    {{ field.names.snake }}: {% if field.type == 'uuid' %}UUID{% elif field.type == 'string' %}str{% elif field.type == 'text' %}str{% elif field.type == 'integer' %}int{% elif field.type == 'float' %}float{% elif field.type == 'boolean' %}bool{% elif field.type == 'datetime' %}datetime{% else %}str{% endif %}
+    {% endif -%}
+    {% endfor %}
+
+    model_config = ConfigDict(from_attributes=True)
 
 {% endfor %}

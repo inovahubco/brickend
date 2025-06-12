@@ -16,9 +16,12 @@ from brickend_core.engine.protected_regions import SmartProtectedRegionsHandler
 
 class CodeGenerator:
     """
-    CodeGenerator renders project files (models, schemas, CRUD, routers, main, db)
+    CodeGenerator renders project files (models, schemas, CRUD, routers, main, database)
     for a specified integration (e.g., "fastapi"), using Jinja2 templates and a context
     built by ContextBuilder, while preserving protected code regions.
+
+    All files are generated inside the app/ directory to match FastAPI conventions
+    and template import expectations.
     """
 
     MODELS_TEMPLATE: str = "models_template.j2"
@@ -33,7 +36,7 @@ class CodeGenerator:
     CRUD_FILENAME: str = "crud.py"
     ROUTER_FILENAME: str = "router.py"
     MAIN_FILENAME: str = "main.py"
-    DB_FILENAME: str = "db.py"
+    DATABASE_FILENAME: str = "database.py"  # Changed from "db.py" to match template imports
 
     def __init__(
         self,
@@ -66,13 +69,13 @@ class CodeGenerator:
           2. Locate each required template file by name.
           3. Render each template with the given context.
           4. Preserve any protected regions from existing files.
-          5. Write rendered content to files under output_dir:
-             - models.py (single file with all entities)
-             - schemas.py (single file with all entities)
-             - crud.py files (one per entity in app/crud/)
-             - router.py files (one per entity in app/routers/)
-             - main.py (single file importing all routers)
-             - db.py (single file)
+          5. Write rendered content to files under output_dir/app/:
+             - app/models.py (single file with all entities)
+             - app/schemas.py (single file with all entities)
+             - app/crud/{entity}_crud.py files (one per entity)
+             - app/routers/{entity}_router.py files (one per entity)
+             - app/main.py (single file importing all routers)
+             - app/database.py (single file)
 
         Args:
             context (Dict[str, Any]): Context dictionary from ContextBuilder.
@@ -110,7 +113,7 @@ class CodeGenerator:
             raise OSError(f"Cannot create output directory '{self.output_dir}': {e}")
 
         try:
-            # Generate single-file templates (models, schemas, main, db)
+            # Generate single-file templates (models, schemas, main, database)
             self._generate_single_file_templates(context)
 
             # Generate per-entity templates (crud, routers)
@@ -125,35 +128,47 @@ class CodeGenerator:
         """
         Generate templates that create single files containing all entities.
 
+        All files are generated inside app/ directory to match the import structure
+        expected by the templates.
+
         Args:
             context (Dict[str, Any]): Context dictionary with entities list.
         """
-        # models.py - single file with all entity models
+        # Create app/ directory structure
+        app_dir = self.output_dir / "app"
+        app_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create __init__.py to make app a Python package
+        (app_dir / "__init__.py").write_text("", encoding="utf-8")
+
+        # Generate all files inside app/ directory
+
+        # app/models.py - single file with all entity models
         self._generate_and_write_file(
             self.MODELS_TEMPLATE,
             context,
-            self.output_dir / self.MODELS_FILENAME
+            app_dir / self.MODELS_FILENAME
         )
 
-        # schemas.py - single file with all entity schemas
+        # app/schemas.py - single file with all entity schemas
         self._generate_and_write_file(
             self.SCHEMAS_TEMPLATE,
             context,
-            self.output_dir / self.SCHEMAS_FILENAME
+            app_dir / self.SCHEMAS_FILENAME
         )
 
-        # main.py - single file importing all routers
+        # app/main.py - single file importing all routers
         self._generate_and_write_file(
             self.MAIN_TEMPLATE,
             context,
-            self.output_dir / self.MAIN_FILENAME
+            app_dir / self.MAIN_FILENAME
         )
 
-        # db.py - single database configuration file
+        # app/database.py - single database configuration file
         self._generate_and_write_file(
             self.DB_TEMPLATE,
             context,
-            self.output_dir / self.DB_FILENAME
+            app_dir / self.DATABASE_FILENAME
         )
 
     def _generate_per_entity_templates(self, context: Dict[str, Any]) -> None:
@@ -188,6 +203,9 @@ class CodeGenerator:
         crud_dir = self.output_dir / "app" / "crud"
         crud_dir.mkdir(parents=True, exist_ok=True)
 
+        # Create __init__.py to make crud a Python package
+        (crud_dir / "__init__.py").write_text("", encoding="utf-8")
+
         # Generate and write entity-specific CRUD file
         crud_filename = f"{entity['names']['snake']}_crud.py"
         crud_path = crud_dir / crud_filename
@@ -209,6 +227,9 @@ class CodeGenerator:
         # Create app/routers directory structure
         routers_dir = self.output_dir / "app" / "routers"
         routers_dir.mkdir(parents=True, exist_ok=True)
+
+        # Create __init__.py to make routers a Python package
+        (routers_dir / "__init__.py").write_text("", encoding="utf-8")
 
         # Generate and write entity-specific Router file
         router_filename = f"{entity['names']['snake']}_router.py"
@@ -240,6 +261,7 @@ class CodeGenerator:
             )
 
         # Write the file
+        output_path.parent.mkdir(parents=True, exist_ok=True)  # Ensure parent directories exist
         output_path.write_text(rendered_content, encoding="utf-8")
 
     def disable_protected_regions(self) -> None:

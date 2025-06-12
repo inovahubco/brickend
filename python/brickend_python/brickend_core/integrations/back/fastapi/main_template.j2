@@ -1,16 +1,43 @@
 {# main_template.j2
    Generates `app/main.py` mounting all routers from `app/routers` #}
 
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
-from app.database import engine, Base
+from app.database import engine
+from app.models import Base
 
 {% for entity in entities %}
 from app.routers.{{ entity.names.snake }}_router import router as {{ entity.names.snake }}_router
 {% endfor %}
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Create all tables in the database on startup.
+    """
+    print("🔄 Creating database tables...")
+    print(f"🔧 Engine: {engine}")
+    print(f"📋 Tables to create: {list(Base.metadata.tables.keys())}")
+    try:
+        Base.metadata.create_all(bind=engine)
+        print("✅ Database tables created successfully")
+
+        # Verify tables were created
+        from sqlalchemy import inspect
+        inspector = inspect(engine)
+        existing_tables = inspector.get_table_names()
+        print(f"📊 Tables in database: {existing_tables}")
+    except Exception as e:
+        print(f"❌ Error creating tables: {e}")
+        import traceback
+        traceback.print_exc()
+    yield
+    print("🔚 Application shutdown")
+
 app = FastAPI(
     title="{{ project_name | default('FastAPI App') }}",
-    version="{{ project_version | default('0.1.0') }}"
+    version="{{ project_version | default('0.1.0') }}",
+    lifespan=lifespan
 )
 
 {% for entity in entities %}
@@ -20,14 +47,6 @@ app.include_router(
     tags=["{{ entity.names.pascal }}"]
 )
 {% endfor %}
-
-@app.on_event("startup")
-def on_startup():
-    """
-    Create all tables in the database on startup.
-    """
-    Base.metadata.create_all(bind=engine)
-
 
 @app.get("/", tags=["root"])
 def read_root():

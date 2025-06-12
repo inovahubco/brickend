@@ -2,10 +2,14 @@
    Generates `app/crud/{{ entity.names.snake }}_crud.py` #}
 
 from sqlalchemy.orm import Session
-from app.models.{{ entity.names.snake }} import {{ entity.names.pascal }}
-from app.schemas.{{ entity.names.snake }} import {{ entity.names.pascal }}Create
+from app.models import {{ entity.names.pascal }}
+from app.schemas import {{ entity.names.pascal }}Create
+{% set first_field = entity.fields[0] %}
+{% if first_field.type == 'uuid' %}from uuid import UUID
+{% elif first_field.type == 'datetime' %}from datetime import datetime
+{% endif %}
 
-def get_{{ entity.names.snake }}(db: Session, id: {{ entity.fields[0].sql_type }}):
+def get_{{ entity.names.snake }}(db: Session, id: {% if first_field.type == 'uuid' %}UUID{% elif first_field.type == 'string' %}str{% elif first_field.type == 'text' %}str{% elif first_field.type == 'integer' %}int{% elif first_field.type == 'float' %}float{% elif first_field.type == 'boolean' %}bool{% elif first_field.type == 'datetime' %}datetime{% else %}str{% endif %}):
     return db.query({{ entity.names.pascal }}).filter(
         {{ entity.names.pascal }}.{{ entity.fields[0].names.snake }} == id
     ).first()
@@ -14,26 +18,26 @@ def get_{{ entity.names.snake }}_list(db: Session, skip: int = 0, limit: int = 1
     return db.query({{ entity.names.pascal }}).offset(skip).limit(limit).all()
 
 def create_{{ entity.names.snake }}(db: Session, obj_in: {{ entity.names.pascal }}Create):
-    db_obj = {{ entity.names.pascal }}(**obj_in.dict())
+    db_obj = {{ entity.names.pascal }}(**obj_in.model_dump())
     db.add(db_obj)
     db.commit()
     db.refresh(db_obj)
     return db_obj
 
 def update_{{ entity.names.snake }}(
-    db: Session, id: {{ entity.fields[0].sql_type }}, obj_in: {{ entity.names.pascal }}Create
+    db: Session, id: {% if first_field.type == 'uuid' %}UUID{% elif first_field.type == 'string' %}str{% elif first_field.type == 'text' %}str{% elif first_field.type == 'integer' %}int{% elif first_field.type == 'float' %}float{% elif first_field.type == 'boolean' %}bool{% elif first_field.type == 'datetime' %}datetime{% else %}str{% endif %}, obj_in: {{ entity.names.pascal }}Create
 ):
     db_obj = get_{{ entity.names.snake }}(db, id)
     if not db_obj:
         return None
-    for field, value in obj_in.dict().items():
+    for field, value in obj_in.model_dump().items():
         setattr(db_obj, field, value)
     db.add(db_obj)
     db.commit()
     db.refresh(db_obj)
     return db_obj
 
-def delete_{{ entity.names.snake }}(db: Session, id: {{ entity.fields[0].sql_type }}):
+def delete_{{ entity.names.snake }}(db: Session, id: {% if first_field.type == 'uuid' %}UUID{% elif first_field.type == 'string' %}str{% elif first_field.type == 'text' %}str{% elif first_field.type == 'integer' %}int{% elif first_field.type == 'float' %}float{% elif first_field.type == 'boolean' %}bool{% elif first_field.type == 'datetime' %}datetime{% else %}str{% endif %}):
     obj = get_{{ entity.names.snake }}(db, id)
     if obj:
         db.delete(obj)

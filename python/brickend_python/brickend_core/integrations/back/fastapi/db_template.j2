@@ -6,18 +6,15 @@
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
-{% if "memory" in database_url %}
+{% set db_url = database_url if database_url and database_url.strip() else "sqlite:///:memory:" %}
 from sqlalchemy.pool import StaticPool
-{% endif %}
 
-SQLALCHEMY_DATABASE_URL = "{{ database_url }}"
+SQLALCHEMY_DATABASE_URL = "{{ db_url }}"
 
 engine = create_engine(
     SQLALCHEMY_DATABASE_URL,
     connect_args={"check_same_thread": False},
-    {% if "memory" in database_url -%}
     poolclass=StaticPool,
-    {% endif -%}
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
