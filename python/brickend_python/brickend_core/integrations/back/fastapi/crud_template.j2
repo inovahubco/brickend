@@ -10,8 +10,14 @@ from app.schemas import {{ entity.names.pascal }}Create
 {% endif %}
 
 def get_{{ entity.names.snake }}(db: Session, id: {% if first_field.type == 'uuid' %}UUID{% elif first_field.type == 'string' %}str{% elif first_field.type == 'text' %}str{% elif first_field.type == 'integer' %}int{% elif first_field.type == 'float' %}float{% elif first_field.type == 'boolean' %}bool{% elif first_field.type == 'datetime' %}datetime{% else %}str{% endif %}):
+    # Convert UUID to string for database comparison
+    {% if first_field.type == 'uuid' -%}
+    search_id = str(id)
+    {%- else -%}
+    search_id = id
+    {%- endif %}
     return db.query({{ entity.names.pascal }}).filter(
-        {{ entity.names.pascal }}.{{ entity.fields[0].names.snake }} == id
+        {{ entity.names.pascal }}.{{ entity.fields[0].names.snake }} == search_id
     ).first()
 
 def get_{{ entity.names.snake }}_list(db: Session, skip: int = 0, limit: int = 100):

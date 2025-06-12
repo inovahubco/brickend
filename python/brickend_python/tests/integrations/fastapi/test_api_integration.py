@@ -352,6 +352,12 @@ def test_crud_endpoints(project):
     """
     print(f"\nStarting CRUD tests in {project}")
 
+    # Clean up any existing test database file
+    test_db_file = project / "test_app.db"
+    if test_db_file.exists():
+        test_db_file.unlink()
+        print(f"🧹 Cleaned up existing test database: {test_db_file}")
+
     possible_main_files = [
         project / "app" / "main.py",
         project / "main.py"
@@ -389,62 +395,73 @@ def test_crud_endpoints(project):
 
     client = TestClient(app)
 
-    print("\nExecuting CRUD tests...")
+    try:
+        print("\nExecuting CRUD tests...")
 
-    # 1. Create user
-    print("1️⃣ Create user...")
-    user_data = {"email": "test@example.com", "full_name": "Test User"}
-    resp = client.post("/users/", json=user_data)
-    print(f"   POST /users/ -> {resp.status_code}: {resp.text}")
+        # 1. Create user
+        print("1️⃣ Create user...")
+        user_data = {"email": "test@example.com", "full_name": "Test User"}
+        resp = client.post("/users/", json=user_data)
+        print(f"   POST /users/ -> {resp.status_code}: {resp.text}")
 
-    assert resp.status_code in [200, 201], f"Create failed: {resp.status_code} - {resp.text}"
-    data = resp.json()
-    assert "id" in data and data["email"] == "test@example.com"
-    user_id = data["id"]
-    print(f"   User created: {user_id}")
+        assert resp.status_code in [200, 201], f"Create failed: {resp.status_code} - {resp.text}"
+        data = resp.json()
+        assert "id" in data and data["email"] == "test@example.com"
+        user_id = data["id"]
+        print(f"   User created: {user_id}")
 
-    # 2. List users
-    print("\n2️⃣ List users...")
-    resp = client.get("/users/")
-    print(f"   GET /users/ -> {resp.status_code}")
+        # 2. List users
+        print("\n2️⃣ List users...")
+        resp = client.get("/users/")
+        print(f"   GET /users/ -> {resp.status_code}")
 
-    assert resp.status_code == 200, f"List failed: {resp.status_code} - {resp.text}"
-    users = resp.json()
-    assert isinstance(users, list) and len(users) == 1
-    print(f"   Found {len(users)} users")
+        assert resp.status_code == 200, f"List failed: {resp.status_code} - {resp.text}"
+        users = resp.json()
+        assert isinstance(users, list) and len(users) == 1
+        print(f"   Found {len(users)} users")
 
-    # 3. Get user
-    print(f"\n3️⃣ Get user {user_id}...")
-    resp = client.get(f"/users/{user_id}")
-    print(f"   GET /users/{user_id} -> {resp.status_code}")
+        # 3. Get user
+        print(f"\n3️⃣ Get user {user_id}...")
+        resp = client.get(f"/users/{user_id}")
+        print(f"   GET /users/{user_id} -> {resp.status_code}")
 
-    assert resp.status_code == 200, f"Get failed: {resp.status_code} - {resp.text}"
-    user_data_retrieved = resp.json()
-    assert user_data_retrieved["id"] == user_id
-    print("   User retrieved")
+        assert resp.status_code == 200, f"Get failed: {resp.status_code} - {resp.text}"
+        user_data_retrieved = resp.json()
+        assert user_data_retrieved["id"] == user_id
+        print("   User retrieved")
 
-    # 4. Delete user
-    print(f"\n4️⃣ Delete user {user_id}...")
-    resp = client.delete(f"/users/{user_id}")
-    print(f"   DELETE /users/{user_id} -> {resp.status_code}")
+        # 4. Delete user
+        print(f"\n4️⃣ Delete user {user_id}...")
+        resp = client.delete(f"/users/{user_id}")
+        print(f"   DELETE /users/{user_id} -> {resp.status_code}")
 
-    assert resp.status_code in [200, 204], f"Delete failed: {resp.status_code} - {resp.text}"
-    print("   User deleted")
+        assert resp.status_code in [200, 204], f"Delete failed: {resp.status_code} - {resp.text}"
+        print("   User deleted")
 
-    # 5. Try to delete again (404)
-    print(f"\n5️⃣ Try delete again...")
-    resp = client.delete(f"/users/{user_id}")
-    print(f"   DELETE /users/{user_id} -> {resp.status_code}")
+        # 5. Try to delete again (404)
+        print(f"\n5️⃣ Try delete again...")
+        resp = client.delete(f"/users/{user_id}")
+        print(f"   DELETE /users/{user_id} -> {resp.status_code}")
 
-    assert resp.status_code == 404, f"Expected 404, got {resp.status_code}"
-    print("   Correctly returns 404")
+        assert resp.status_code == 404, f"Expected 404, got {resp.status_code}"
+        print("   Correctly returns 404")
 
-    # 6. Try get deleted user (404)
-    print(f"\n6️⃣ Try get deleted user...")
-    resp = client.get(f"/users/{user_id}")
-    print(f"   GET /users/{user_id} -> {resp.status_code}")
+        # 6. Try get deleted user (404)
+        print(f"\n6️⃣ Try get deleted user...")
+        resp = client.get(f"/users/{user_id}")
+        print(f"   GET /users/{user_id} -> {resp.status_code}")
 
-    assert resp.status_code == 404, f"Expected 404, got {resp.status_code}"
-    print("   Correctly returns 404")
+        assert resp.status_code == 404, f"Expected 404, got {resp.status_code}"
+        print("   Correctly returns 404")
 
-    print("\nAll CRUD tests successful!")
+        print("\nAll CRUD tests successful!")
+
+
+    finally:
+        try:
+            if test_db_file.exists():
+                test_db_file.unlink()
+                print(f"🧹 Cleaned up test database: {test_db_file}")
+        except PermissionError:
+            print(f"⚠️  Could not delete {test_db_file} (file in use)")
+            pass

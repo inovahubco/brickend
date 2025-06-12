@@ -10,14 +10,22 @@ from alembic import context
 sys.path.append(os.getcwd())
 
 try:
-    from db import SQLALCHEMY_DATABASE_URL
+    # Import from the new app structure
+    from app.database import SQLALCHEMY_DATABASE_URL
     DATABASE_URL = SQLALCHEMY_DATABASE_URL
-    from models import Base
+    from app.models import Base
 except ImportError as e:
-    raise ImportError(
-        "Could not import db or models. "
-        "Make sure you've generated the project and are on the right path."
-    ) from e
+    try:
+        # Fallback: try old structure for backward compatibility
+        from db import SQLALCHEMY_DATABASE_URL
+        DATABASE_URL = SQLALCHEMY_DATABASE_URL
+        from models import Base
+    except ImportError:
+        raise ImportError(
+            "Could not import database or models. "
+            "Make sure you've generated the project and are on the right path. "
+            "Expected: app/database.py and app/models.py or db.py and models.py"
+        ) from e
 
 config = context.config
 fileConfig(config.config_file_name)

@@ -10,16 +10,18 @@ from app.models import Base
 from app.routers.{{ entity.names.snake }}_router import router as {{ entity.names.snake }}_router
 {% endfor %}
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
+def create_tables():
     """
-    Create all tables in the database on startup.
+    Create all tables in the database.
+    This function is called during application startup.
     """
     print("🔄 Creating database tables...")
     print(f"🔧 Engine: {engine}")
     print(f"📋 Tables to create: {list(Base.metadata.tables.keys())}")
+
     try:
-        Base.metadata.create_all(bind=engine)
+        # Force creation of all tables
+        Base.metadata.create_all(bind=engine, checkfirst=True)
         print("✅ Database tables created successfully")
 
         # Verify tables were created
@@ -27,10 +29,28 @@ async def lifespan(app: FastAPI):
         inspector = inspect(engine)
         existing_tables = inspector.get_table_names()
         print(f"📊 Tables in database: {existing_tables}")
+
+        # Validate that expected tables exist
+        expected_tables = list(Base.metadata.tables.keys())
+        missing_tables = [t for t in expected_tables if t not in existing_tables]
+        if missing_tables:
+            print(f"⚠️  Missing tables: {missing_tables}")
+        else:
+            print("✅ All expected tables exist")
+
     except Exception as e:
         print(f"❌ Error creating tables: {e}")
         import traceback
         traceback.print_exc()
+        raise
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Application lifespan manager.
+    Creates database tables on startup.
+    """
+    create_tables()
     yield
     print("🔚 Application shutdown")
 
@@ -39,6 +59,21 @@ app = FastAPI(
     version="{{ project_version | default('0.1.0') }}",
     lifespan=lifespan
 )
+
+# Create tables immediately if not already created
+# This ensures tables exist even if lifespan isn't called (e.g., in tests)
+try:
+    from sqlalchemy import inspect
+    inspector = inspect(engine)
+    existing_tables = inspector.get_table_names()
+    expected_tables = list(Base.metadata.tables.keys())
+
+    if not all(table in existing_tables for table in expected_tables):
+        print("🔧 Tables missing, creating them now...")
+        create_tables()
+except Exception as e:
+    print(f"⚠️  Could not verify tables, attempting creation: {e}")
+    create_tables()
 
 {% for entity in entities %}
 app.include_router(

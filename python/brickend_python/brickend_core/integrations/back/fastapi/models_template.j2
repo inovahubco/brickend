@@ -16,7 +16,7 @@ Base = declarative_base()
 
 {% for entity in entities %}
 class {{ entity.names.pascal }}(Base):
-    __tablename__ = "{{ entity.names.snake }}"
+    __tablename__ = "{{ entity.names.snake }}s"  {# ← CAMBIO: Agregado 's' para plural #}
 
     {% for field in entity.fields -%}
     {{ field.names.snake }} = Column(

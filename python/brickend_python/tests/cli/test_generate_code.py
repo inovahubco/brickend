@@ -299,7 +299,7 @@ def test_generate_code_content_validation(tmp_path):
     models_content = (output_dir / "app" / "models.py").read_text(encoding="utf-8")
     assert "from sqlalchemy import Column" in models_content
     assert "class User(Base):" in models_content
-    assert "__tablename__ = \"user\"" in models_content
+    assert "__tablename__ = \"users\"" in models_content
 
     schemas_content = (output_dir / "app" / "schemas.py").read_text(encoding="utf-8")
     assert "from pydantic import BaseModel" in schemas_content
