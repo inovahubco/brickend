@@ -1,0 +1,91 @@
+{# main_template.j2
+
+Generates `app/main.py` mounting all routers from `app/routers`.
+
+This template:
+  - Imports FastAPI, SQLAlchemy engine, and Base model metadata.
+  - Defines `create_tables` to initialize database tables with logging and validation.
+  - Implements an async lifespan manager to run on startup/shutdown.
+  - Configures the FastAPI app with title and version from context.
+  - Ensures tables exist even outside the lifespan (e.g., during tests).
+  - Includes routers for each entity under `/{{ entity.names.kebab }}s` with proper tags.
+  - Provides a root endpoint (`GET /`) returning a welcome message.
+#}
+
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+from app.database import engine
+from app.models import Base
+
+{% for entity in entities %}
+from app.routers.{{ entity.names.snake }}_router import router as {{ entity.names.snake }}_router
+{% endfor %}
+
+def create_tables():
+    """
+    Create all tables in the database; log progress and verify existence.
+    """
+    print("🔄 Creating database tables...")
+    print(f"🔧 Engine: {engine}")
+    print(f"📋 Tables to create: {list(Base.metadata.tables.keys())}")
+
+    try:
+        Base.metadata.create_all(bind=engine, checkfirst=True)
+        print("✅ Database tables created successfully")
+
+        from sqlalchemy import inspect
+        inspector = inspect(engine)
+        existing_tables = inspector.get_table_names()
+        print(f"📊 Tables in database: {existing_tables}")
+
+        expected = list(Base.metadata.tables.keys())
+        missing = [t for t in expected if t not in existing_tables]
+        if missing:
+            print(f"⚠️  Missing tables: {missing}")
+        else:
+            print("✅ All expected tables exist")
+    except Exception as e:
+        print(f"❌ Error creating tables: {e}")
+        import traceback; traceback.print_exc()
+        raise
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Lifespan manager: creates tables on startup, logs shutdown.
+    """
+    create_tables()
+    yield
+    print("🔚 Application shutdown")
+
+app = FastAPI(
+    title="{{ project_name | default('FastAPI App') }}",
+    version="{{ project_version | default('0.1.0') }}",
+    lifespan=lifespan
+)
+
+# Ensure tables exist outside lifespan (e.g., during imports/tests)
+try:
+    from sqlalchemy import inspect
+    inspector = inspect(engine)
+    existing = inspector.get_table_names()
+    expected = list(Base.metadata.tables.keys())
+    if not all(table in existing for table in expected):
+        print("🔧 Tables missing, creating them now...")
+        create_tables()
+except Exception as e:
+    print(f"⚠️  Could not verify tables, attempting creation: {e}")
+    create_tables()
+
+{% for entity in entities %}
+app.include_router(
+    {{ entity.names.snake }}_router,
+    prefix="/{{ entity.names.kebab }}s",
+    tags=["{{ entity.names.pascal }}"]
+)
+{% endfor %}
+
+@app.get("/", tags=["root"])
+def read_root():
+    """Root endpoint returning a welcome message."""
+    return {"message": "Welcome to {{ project_name | default('your app') }}!"}

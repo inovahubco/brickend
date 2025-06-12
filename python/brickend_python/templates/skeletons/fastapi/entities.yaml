@@ -1,0 +1,24 @@
+# Defines the initial list of entities for your FastAPI skeleton.
+# Use the `brickend add_entity entity` command to add new entries here.
+
+# Example (commented out):
+# entities:
+#   - name: User
+#     fields:
+#       - name: id
+#         type: uuid
+#         primary_key: true
+#         unique: true
+#         nullable: false
+#       - name: email
+#         type: string
+#         primary_key: false
+#         unique: true
+#         nullable: false
+#       - name: full_name
+#         type: string
+#         primary_key: false
+#         unique: false
+#         nullable: false
+
+entities: []

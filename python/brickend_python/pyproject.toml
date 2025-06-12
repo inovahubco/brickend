@@ -1,0 +1,35 @@
+[project]
+name = "brickend_python"
+version = "0.1.0"
+description = "Core engine and CLI to generate FastAPI projects from entities defined in YAML"
+authors = []
+license = { text = "" }
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "jinja2>=3.1,<4.0",
+  "pydantic>=1.10,<2.0",
+  "ruamel.yaml>=0.17,<1.0",
+  "fastapi>=0.100.0,<0.101.0",
+  "sqlalchemy>=2.0,<3.0",
+  "typer>=0.9,<1.0",
+  "alembic>=1.11,<2.0",
+  "questionary>=1.10,<2.0"
+]
+
+[build-system]
+requires = ["setuptools>=60.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.flake8]
+max-line-length = 88
+extend-ignore = ["E203"]
+
+[tool.isort]
+profile = "black"
+
+[tool.mypy]
+strict = true
+
+[project.scripts]
+brickend = "brickend_cli.main:app"

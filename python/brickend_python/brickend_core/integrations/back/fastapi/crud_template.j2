@@ -1,0 +1,78 @@
+{#
+crud_template.j2
+
+Generates the CRUD module for a single entity in `app/crud/{{ entity.names.snake }}_crud.py`.
+
+This template renders the following functions for the `{{ entity.names.pascal }}` entity:
+  - `get_{{ entity.names.snake }}`: retrieve one record by primary key
+  - `get_{{ entity.names.snake }}_list`: retrieve a list of records with pagination
+  - `create_{{ entity.names.snake }}`: insert a new record
+  - `update_{{ entity.names.snake }}`: update an existing record
+  - `delete_{{ entity.names.snake }}`: delete a record
+
+Protected regions for custom methods can be added between:
+    # BRICKEND:PROTECTED-START CRUD_METHODS
+    # BRICKEND:PROTECTED-END CRUD_METHODS
+#}
+
+from sqlalchemy.orm import Session
+from app.models import {{ entity.names.pascal }}
+from app.schemas import {{ entity.names.pascal }}Create
+{% set first_field = entity.fields[0] %}
+{% if first_field.type == 'uuid' %}from uuid import UUID
+{% elif first_field.type == 'datetime' %}from datetime import datetime
+{% endif %}
+
+def get_{{ entity.names.snake }}(
+    db: Session,
+    id: {% if first_field.type == 'uuid' %}UUID{% elif first_field.type == 'string' %}str{% elif first_field.type == 'text' %}str{% elif first_field.type == 'integer' %}int{% elif first_field.type == 'float' %}float{% elif first_field.type == 'boolean' %}bool{% elif first_field.type == 'datetime' %}datetime{% else %}str{% endif %}
+):
+    """Retrieve a single {{ entity.names.pascal }} by its primary key."""
+    # Convert UUID to string for database comparison
+    {% if first_field.type == 'uuid' -%}
+    search_id = str(id)
+    {%- else -%}
+    search_id = id
+    {%- endif %}
+    return db.query({{ entity.names.pascal }}).filter(
+        {{ entity.names.pascal }}.{{ first_field.names.snake }} == search_id
+    ).first()
+
+def get_{{ entity.names.snake }}_list(db: Session, skip: int = 0, limit: int = 100):
+    """Retrieve a list of {{ entity.names.pascal }} records with pagination."""
+    return db.query({{ entity.names.pascal }}).offset(skip).limit(limit).all()
+
+def create_{{ entity.names.snake }}(db: Session, obj_in: {{ entity.names.pascal }}Create):
+    """Create and return a new {{ entity.names.pascal }} record."""
+    db_obj = {{ entity.names.pascal }}(**obj_in.model_dump())
+    db.add(db_obj)
+    db.commit()
+    db.refresh(db_obj)
+    return db_obj
+
+def update_{{ entity.names.snake }}(
+    db: Session,
+    id: {% if first_field.type == 'uuid' %}UUID{% elif first_field.type == 'string' %}str{% elif first_field.type == 'text' %}str{% elif first_field.type == 'integer' %}int{% elif first_field.type == 'float' %}float{% elif first_field.type == 'boolean' %}bool{% elif first_field.type == 'datetime' %}datetime{% else %}str{% endif %},
+    obj_in: {{ entity.names.pascal }}Create
+):
+    """Update an existing {{ entity.names.pascal }} record by its primary key."""
+    db_obj = get_{{ entity.names.snake }}(db, id)
+    if not db_obj:
+        return None
+    for field, value in obj_in.model_dump().items():
+        setattr(db_obj, field, value)
+    db.add(db_obj)
+    db.commit()
+    db.refresh(db_obj)
+    return db_obj
+
+def delete_{{ entity.names.snake }}(
+    db: Session,
+    id: {% if first_field.type == 'uuid' %}UUID{% elif first_field.type == 'string' %}str{% elif first_field.type == 'text' %}str{% elif first_field.type == 'integer' %}int{% elif first_field.type == 'float' %}float{% elif first_field.type == 'boolean' %}bool{% elif first_field.type == 'datetime' %}datetime{% else %}str{% endif %}
+):
+    """Delete a {{ entity.names.pascal }} record by its primary key."""
+    obj = get_{{ entity.names.snake }}(db, id)
+    if obj:
+        db.delete(obj)
+        db.commit()
+    return obj
