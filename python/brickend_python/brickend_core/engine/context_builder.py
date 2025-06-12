@@ -1,9 +1,8 @@
 """
 context_builder.py
 
-Defines ContextBuilder, which transforms a validated entities dictionary
-(into Python primitives) into a richer context for Jinja2 templates. The context
-includes name variations, SQL type mappings, primary key metadata, and more.
+ContextBuilder transforms a validated entities dictionary into a richer context
+suitable for rendering Jinja2 templates.
 """
 
 from typing import Any, Dict, List
@@ -28,34 +27,50 @@ TYPE_MAPPING: Dict[str, str] = {
 
 class ContextBuilder:
     """
-    ContextBuilder takes a dictionary of entities (already validated by Pydantic)
-    and builds a context dictionary suitable for rendering Jinja2 templates.
+    Build a template context from a validated entities' dictionary.
+
+    The generated context includes:
+      - A list of entities with name variations and field metadata.
+      - The total entity count.
     """
 
     def __init__(self) -> None:
-        """
-        Initialize a ContextBuilder instance.
-        Currently, no parameters are required. In the future, a logger or additional
-        settings could be injected here.
-        """
+        """Initialize a ContextBuilder instance."""
+        # No initialization parameters required at this time.
         pass
 
     def build_context(self, entities_dict: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Build a template context from the validated entities' dictionary.
+        Generate a context dictionary for code generation templates.
 
         Args:
-            entities_dict (Dict[str, Any]): A dictionary matching the shape of
-                EntitiesFile.dict(), i.e. {"entities": [ { "name": ..., "fields": [...] }, ... ]}.
+            entities_dict (Dict[str, Any]): Dictionary matching the structure of
+                EntitiesFile.dict(), e.g.
+                {
+                    "entities": [
+                        { "name": "User", "fields": [ { ... }, ... ] },
+                        ...
+                    ]
+                }
 
         Returns:
             Dict[str, Any]: A context dictionary containing:
-                - "entities": List of entity contexts.
+                - "entities": List[Dict[str, Any]] where each dict contains:
+                    * original_name (str)
+                    * names (dict with snake, pascal, kebab)
+                    * fields (list of field metadata dicts)
+                    * primary_key_field (str or list of str)
+                    * field_count (int)
                 - "entity_count": Total number of entities.
 
         Raises:
-            ValueError: If any entity or field name is invalid, if there are duplicate entity names,
-                        if there are duplicate field names within an entity, or if an entity lacks a primary key.
+            ValueError: If:
+                - 'entities' is not a list.
+                - Duplicate entity names are found.
+                - Entity or field names are invalid.
+                - Duplicate field names within an entity are found.
+                - An entity has no primary key field.
+                - A field type is not recognized in TYPE_MAPPING.
         """
         raw_entities = entities_dict.get("entities", [])
         if not isinstance(raw_entities, list):
@@ -128,7 +143,7 @@ class ContextBuilder:
                 if is_primary_key:
                     primary_keys.append(fld_snake)
 
-                field_entry: Dict[str, Any] = {
+                fields_context.append({
                     "original_name": original_field_name,
                     "names": {
                         "snake": fld_snake,
@@ -143,15 +158,14 @@ class ContextBuilder:
                     "default": default_val,
                     "foreign_key": foreign_key,
                     "constraints": constraints.copy() if isinstance(constraints, list) else [],
-                }
-                fields_context.append(field_entry)
+                })
 
             if not primary_keys:
                 raise ValueError(
                     f"Entity '{original_ent_name}' does not have any field marked as primary_key."
                 )
 
-            entity_entry: Dict[str, Any] = {
+            entities_context.append({
                 "original_name": original_ent_name,
                 "names": {
                     "snake": ent_snake,
@@ -161,11 +175,9 @@ class ContextBuilder:
                 "fields": fields_context,
                 "primary_key_field": primary_keys[0] if len(primary_keys) == 1 else primary_keys,
                 "field_count": len(fields_context),
-            }
-            entities_context.append(entity_entry)
+            })
 
-        context: Dict[str, Any] = {
+        return {
             "entities": entities_context,
             "entity_count": len(entities_context),
         }
-        return context

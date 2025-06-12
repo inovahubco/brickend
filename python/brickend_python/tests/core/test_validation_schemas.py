@@ -1,12 +1,13 @@
 """
 test_validation_schemas.py
 
-Unit tests for the Pydantic models in validation_schemas.py, covering:
-1. A valid entities structure.
-2. Missing required keys.
-3. Invalid field type.
-4. Entity name or field name format violations.
-5. Entities list being empty.
+Unit tests for the Pydantic models in validation_schemas.py.
+Covers:
+  - A valid entities structure.
+  - Missing required keys.
+  - Invalid field type.
+  - Entity name or field name format violations.
+  - Entities list being empty.
 """
 
 import pytest
@@ -17,9 +18,11 @@ from brickend_core.config.validation_schemas import EntitiesFile
 
 def test_valid_entities_file():
     """
-    A basic valid EntitiesFile where:
+    Test successful validation of a basic EntitiesFile payload.
+
+    Verifies:
       - One entity named 'User'.
-      - Two fields: 'id' (uuid, primary key) and 'email' (string, unique).
+      - Two fields: 'id' (uuid, primary_key=True) and 'email' (string, unique=True, nullable=False).
     """
     payload = {
         "entities": [
@@ -45,7 +48,9 @@ def test_valid_entities_file():
 
 def test_missing_entities_key():
     """
-    When the top-level 'entities' key is missing, Pydantic should raise a ValidationError.
+    Test that omission of the top-level 'entities' key raises a ValidationError.
+
+    Verifies error message mentions 'entities' and indicates a missing required field.
     """
     payload = {
         "models": [
@@ -65,7 +70,9 @@ def test_missing_entities_key():
 
 def test_empty_entities_list():
     """
-    If 'entities' is present but is an empty list, the validator should reject it.
+    Test that an empty 'entities' list is rejected by the validator.
+
+    Verifies the ValidationError message indicates the list must contain at least one entity.
     """
     payload = {"entities": []}
 
@@ -77,7 +84,9 @@ def test_empty_entities_list():
 
 def test_entity_missing_name():
     """
-    If an entity object is missing the 'name' key, Pydantic should raise a ValidationError.
+    Test that an entity object missing the 'name' key raises a ValidationError.
+
+    Verifies the error message indicates 'name' is required.
     """
     payload = {
         "entities": [
@@ -97,8 +106,12 @@ def test_entity_missing_name():
 
 def test_entity_invalid_name_format():
     """
-    If an entity name does not match the regex, the validator should reject it.
-    E.g., starting with a digit or containing invalid characters.
+    Test that an entity name violating the naming regex is rejected.
+
+    Scenario:
+      - Name starts with a digit ('123Invalid').
+
+    Verifies the error message describes the naming requirement.
     """
     payload = {
         "entities": [
@@ -116,7 +129,9 @@ def test_entity_invalid_name_format():
 
 def test_field_missing_name():
     """
-    If a field object is missing the 'name' key, Pydantic should raise a ValidationError.
+    Test that a field object missing the 'name' key raises a ValidationError.
+
+    Verifies the error message indicates 'name' is required for fields.
     """
     payload = {
         "entities": [
@@ -140,8 +155,12 @@ def test_field_missing_name():
 
 def test_field_invalid_name_format():
     """
-    If a field name does not match the regex (e.g. starts with a digit or contains hyphens),
-    the validator should reject it.
+    Test that a field name violating the naming regex is rejected.
+
+    Scenario:
+      - Name starts with a digit ('1st_field').
+
+    Verifies the error message describes the naming requirement for fields.
     """
     payload = {
         "entities": [
@@ -161,7 +180,12 @@ def test_field_invalid_name_format():
 
 def test_field_invalid_type():
     """
-    If a field type is not in ALLOWED_FIELD_TYPES, the validator should reject it.
+    Test that a field type not in ALLOWED_FIELD_TYPES is rejected.
+
+    Scenario:
+      - Field 'age' with type 'int32'.
+
+    Verifies the error message lists allowed field types.
     """
     payload = {
         "entities": [
@@ -183,7 +207,9 @@ def test_field_invalid_type():
 
 def test_entity_with_no_fields():
     """
-    If an entity has an empty 'fields' list, the validator should reject it.
+    Test that an entity with an empty 'fields' list is rejected by the validator.
+
+    Verifies the ValidationError message indicates each entity must have at least one field.
     """
     payload = {
         "entities": [

@@ -1,22 +1,28 @@
-{#
-  models_template.j2
+{# models_template.j2
 
-  Generates SQLAlchemy model classes for each entity.
+Generates SQLAlchemy model classes for each entity.
 #}
+
+"""models.py
+
+SQLAlchemy model classes for each entity.
+"""
 
 from sqlalchemy import Column, String, Integer, Float, Boolean, Text
 from sqlalchemy.orm import declarative_base
 import uuid
 
+
 def generate_uuid():
     """Generate a UUID string for primary keys."""
     return str(uuid.uuid4())
+
 
 Base = declarative_base()
 
 {% for entity in entities %}
 class {{ entity.names.pascal }}(Base):
-    __tablename__ = "{{ entity.names.snake }}s"  {# ← CAMBIO: Agregado 's' para plural #}
+    __tablename__ = "{{ entity.names.snake }}s"
 
     {% for field in entity.fields -%}
     {{ field.names.snake }} = Column(

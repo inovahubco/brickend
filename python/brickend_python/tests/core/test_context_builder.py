@@ -1,13 +1,13 @@
 """
 test_context_builder.py
 
-Unit tests for ContextBuilder in core.engine.context_builder.
+Unit tests for ContextBuilder in brickend_core.engine.context_builder.
 Covers:
-  1. Successful context creation for a valid single entity with two fields.
-  2. Invalid entity name format.
-  3. Entity without any primary key.
-  4. Duplicate entity names in input.
-  5. Duplicate field names within an entity.
+  - Successful context creation for a valid single entity with two fields.
+  - Invalid entity name format triggers ValueError.
+  - Entity without a primary key triggers ValueError.
+  - Duplicate entity names triggers ValueError.
+  - Duplicate field names within an entity triggers ValueError.
 """
 
 import pytest
@@ -17,9 +17,16 @@ from brickend_core.engine.context_builder import ContextBuilder
 
 def make_simple_entities_dict() -> dict:
     """
-    Helper to create a valid entities_dict for testing:
-    - One entity named 'User'
-    - Two fields: 'id' (uuid, primary_key=True) and 'email' (string, unique, nullable=False)
+    Helper to create a valid entities dictionary for testing.
+
+    Creates:
+      - One entity named 'User'.
+      - Two fields:
+          * 'id': type 'uuid', primary_key=True, unique=False, nullable=False.
+          * 'email': type 'string', primary_key=False, unique=True, nullable=False.
+
+    Returns:
+        dict: Dictionary representing the entities configuration.
     """
     return {
         "entities": [
@@ -54,8 +61,13 @@ def make_simple_entities_dict() -> dict:
 
 def test_build_context_success():
     """
-    Given a valid entities dict with one entity and two fields,
-    ContextBuilder.build_context should produce the correct structure.
+    Test successful context creation for a valid single entity with two fields.
+
+    Verifies:
+      - 'entities' and 'entity_count' keys in the returned context.
+      - Correct naming variations (snake, pascal, kebab) for the entity.
+      - Field count and primary_key_field value.
+      - Each field's metadata, including SQL type and flags (is_primary_key, is_unique, is_nullable).
     """
     builder = ContextBuilder()
     entities_dict = make_simple_entities_dict()
@@ -101,8 +113,10 @@ def test_build_context_success():
 
 def test_invalid_entity_name():
     """
-    If an entity has a name that does not match the regex (e.g., starts with a digit),
-    ContextBuilder.build_context should raise a ValueError.
+    Test that ContextBuilder.build_context raises ValueError on invalid entity name.
+
+    Scenario:
+      - Entity name starts with a digit ('123Invalid'), which violates naming rules.
     """
     builder = ContextBuilder()
     bad_entities = {
@@ -123,7 +137,10 @@ def test_invalid_entity_name():
 
 def test_entity_without_primary_key():
     """
-    If an entity has no field marked as primary_key=True, build_context should raise a ValueError.
+    Test that ContextBuilder.build_context raises ValueError when no field is marked as primary_key.
+
+    Scenario:
+      - Entity has fields defined but none with primary_key=True.
     """
     builder = ContextBuilder()
     no_pk_entities = {
@@ -144,7 +161,10 @@ def test_entity_without_primary_key():
 
 def test_duplicate_entity_names():
     """
-    If two entities share the same name, build_context should raise a ValueError.
+    Test that ContextBuilder.build_context raises ValueError on duplicate entity names.
+
+    Scenario:
+      - Two entities share the same 'name' value.
     """
     builder = ContextBuilder()
     dup_entities = {
@@ -171,7 +191,10 @@ def test_duplicate_entity_names():
 
 def test_duplicate_field_names_in_entity():
     """
-    If an entity has two fields with the same name, build_context should raise a ValueError.
+    Test that ContextBuilder.build_context raises ValueError on duplicate field names within an entity.
+
+    Scenario:
+      - An entity defines two fields with identical 'name' values.
     """
     builder = ContextBuilder()
     dup_field_entities = {

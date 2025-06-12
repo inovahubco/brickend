@@ -1,5 +1,16 @@
 """
-test_protected_regions.py - Complete version with protection functionality
+test_protected_regions.py
+
+Unit tests for protected regions functionality in CodeGenerator and SmartProtectedRegionsHandler.
+Covers:
+  - Preservation of a single protected region across regenerations.
+  - Direct testing of SmartProtectedRegionsHandler.extract_protected_regions and inject_protected_regions.
+  - Verification of project file structure generation.
+  - Disabling of protected regions.
+  - Handling of multiple protected regions in one file.
+  - Robustness against malformed protected region markers.
+  - Debugging context structure for template expectations.
+  - Edge cases for extraction and injection with empty or missing files.
 """
 
 from pathlib import Path
@@ -14,8 +25,16 @@ from brickend_core.engine.protected_regions import SmartProtectedRegionsHandler
 def test_protected_regions(tmp_path):
     """
     Ensure that a protected region in user_crud.py is preserved across regenerations.
+
+    Steps:
+      1. Generate initial CRUD file for a User entity.
+      2. Manually insert a CRUD_METHODS protected region.
+      3. Regenerate code.
+      4. Verify the custom protected block remains in the regenerated file.
+
+    Args:
+        tmp_path (Path): Temporary directory fixture for output generation.
     """
-    # 1. Build the generation context for a simple User entity
     entities_dict = {
         "entities": [
             {
@@ -29,7 +48,6 @@ def test_protected_regions(tmp_path):
     builder = ContextBuilder()
     context = builder.build_context(entities_dict)
 
-    # 2. Locate the FastAPI integration templates
     template_dir = (
         Path(__file__)
         .parents[2]
@@ -41,7 +59,6 @@ def test_protected_regions(tmp_path):
     registry = TemplateRegistry([template_dir])
     engine = TemplateEngine([template_dir], auto_reload=False)
 
-    # 3. First code generation
     output_dir = tmp_path / "output"
     generator = CodeGenerator(engine, registry, output_dir, preserve_protected_regions=True)
     generator.generate_project(context, "fastapi")
@@ -50,20 +67,16 @@ def test_protected_regions(tmp_path):
     crud_path = output_dir / "app" / "crud" / "user_crud.py"
     assert crud_path.exists(), f"user_crud.py was not generated at {crud_path}"
 
-    # 4. Read original content and insert a protected region
     original_content = crud_path.read_text(encoding="utf-8")
     print("=== ORIGINAL CONTENT ===")
     print(original_content)
 
-    # Insert protected region after imports, before first function
     original_lines = original_content.splitlines()
 
-    # Find the best insertion point (after imports, before first function)
     insert_index = None
     for i, line in enumerate(original_lines):
         stripped = line.strip()
         if stripped.startswith("from ") or stripped.startswith("import "):
-            # Look ahead to see if next non-empty line is a function
             for j in range(i + 1, len(original_lines)):
                 next_line = original_lines[j].strip()
                 if not next_line:
@@ -76,7 +89,6 @@ def test_protected_regions(tmp_path):
             if insert_index:
                 break
 
-    # If no good spot found, insert after all imports
     if insert_index is None:
         for i, line in enumerate(original_lines):
             stripped = line.strip()
@@ -108,10 +120,8 @@ def test_protected_regions(tmp_path):
     print("=== MODIFIED CONTENT WITH PROTECTED REGION ===")
     print(modified_content)
 
-    # 5. Regenerate project
     generator.generate_project(context, "fastapi")
 
-    # 6. Verify the protected block is still present
     new_content = crud_path.read_text(encoding="utf-8")
     print("=== CONTENT AFTER REGENERATION ===")
     print(new_content)
@@ -124,11 +134,14 @@ def test_protected_regions(tmp_path):
 
 def test_protected_regions_handler_directly():
     """
-    Test the protected regions handler functionality directly.
+    Test the SmartProtectedRegionsHandler functionality directly.
+
+    Verifies:
+      - extract_protected_regions correctly identifies a well-formed region.
+      - inject_protected_regions reinserts the region into new content at the correct point.
     """
     handler = SmartProtectedRegionsHandler()
 
-    # Test content with protected regions
     content_with_regions = """from sqlalchemy.orm import Session
 from app.models.user import User
 
@@ -142,12 +155,10 @@ def get_user(db: Session, id: str):
     return db.query(User).first()
 """
 
-    # Extract protected regions
     regions = handler.extract_protected_regions(content_with_regions)
     assert "CRUD_METHODS" in regions
     assert "# Custom user logic here" in "\n".join(regions["CRUD_METHODS"])
 
-    # Test injection into new content
     new_content = """from sqlalchemy.orm import Session
 from app.models.user import User
 
@@ -165,9 +176,13 @@ def create_user(db: Session, user_data):
 
 def test_project_structure_generation(tmp_path):
     """
-    Test that the correct file structure is generated.
+    Test that the correct file structure is generated for multiple entities.
+
+    Verifies single-file templates under app/ and per-entity files in app/crud/ and app/routers/.
+
+    Args:
+        tmp_path (Path): Temporary directory fixture for output generation.
     """
-    # Build context for multiple entities to test the structure
     entities_dict = {
         "entities": [
             {
@@ -189,7 +204,6 @@ def test_project_structure_generation(tmp_path):
     builder = ContextBuilder()
     context = builder.build_context(entities_dict)
 
-    # Generate code
     template_dir = (
         Path(__file__)
         .parents[2]
@@ -222,7 +236,10 @@ def test_project_structure_generation(tmp_path):
 
 def test_disable_protected_regions(tmp_path):
     """
-    Test that protected regions can be disabled.
+    Test that protected regions can be disabled and are overwritten on regeneration.
+
+    Args:
+        tmp_path (Path): Temporary directory fixture for output generation.
     """
     entities_dict = {
         "entities": [
@@ -271,6 +288,11 @@ def test_disable_protected_regions(tmp_path):
 def test_multiple_protected_regions(tmp_path):
     """
     Test handling of multiple protected regions in the same file.
+
+    Verifies that all inserted regions are preserved after code regeneration.
+
+    Args:
+        tmp_path (Path): Temporary directory fixture for output generation.
     """
     entities_dict = {
         "entities": [
@@ -349,11 +371,12 @@ def test_multiple_protected_regions(tmp_path):
 
 def test_protected_regions_with_syntax_errors():
     """
-    Test that protected regions handler is robust against malformed regions.
+    Test that malformed protected region markers are ignored during extraction.
+
+    Verifies that only properly closed regions are extracted and others are skipped.
     """
     handler = SmartProtectedRegionsHandler()
 
-    # Test content with malformed protected regions
     malformed_content = """from sqlalchemy.orm import Session
 
 # BRICKEND:PROTECTED-START REGION1
@@ -380,9 +403,13 @@ def some_function():
 
 def test_debug_context_structure(tmp_path):
     """
-    Debug test to understand the context structure and template expectations.
+    Debug test to inspect the context dictionary produced by ContextBuilder.
+
+    Prints out keys, entity count, and naming structures for manual inspection.
+
+    Args:
+        tmp_path (Path): Temporary directory fixture (unused in content).
     """
-    # Build the generation context for a simple User entity
     entities_dict = {
         "entities": [
             {
@@ -396,7 +423,6 @@ def test_debug_context_structure(tmp_path):
     builder = ContextBuilder()
     context = builder.build_context(entities_dict)
 
-    # Debug: Print the complete context structure
     print("=== CONTEXT STRUCTURE ===")
     print(f"Context keys: {list(context.keys())}")
     print(f"Entity count: {context.get('entity_count', 0)}")
@@ -411,7 +437,6 @@ def test_debug_context_structure(tmp_path):
             else:
                 print("    No 'names' field found!")
 
-    # Test that we can create entity-specific context
     entities = context.get('entities', [])
     if entities:
         entity_context = context.copy()
@@ -424,14 +449,17 @@ def test_debug_context_structure(tmp_path):
 def test_edge_cases_protected_regions():
     """
     Test edge cases for protected regions handling.
+
+    Verifies:
+      - extract_protected_regions returns empty dict on empty content.
+      - No injection errors when injecting into content without functions.
+      - preserve_protected_regions returns new_content unchanged for non-existent files.
     """
     handler = SmartProtectedRegionsHandler()
 
-    # Test empty content
     regions = handler.extract_protected_regions("")
     assert len(regions) == 0
 
-    # Test content with no protected regions
     normal_content = """from sqlalchemy.orm import Session
 
 def get_user():
@@ -440,7 +468,6 @@ def get_user():
     regions = handler.extract_protected_regions(normal_content)
     assert len(regions) == 0
 
-    # Test injection into content with no functions
     new_content = "# Just a comment"
     test_regions = {
         "TEST": ["# BRICKEND:PROTECTED-START TEST", "# code", "# BRICKEND:PROTECTED-END TEST"]
@@ -449,7 +476,6 @@ def get_user():
     result = handler.inject_protected_regions(new_content, test_regions)
     assert "# code" in result
 
-    # Test preserve_protected_regions with non-existent file
     from pathlib import Path
     import tempfile
 

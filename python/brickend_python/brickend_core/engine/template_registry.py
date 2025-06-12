@@ -1,8 +1,7 @@
 """
 template_registry.py
 
-Defines TemplateRegistry, which scans a list of integration directories
-and indexes all Jinja2 template files (*.j2) by integration name.
+Scans integration directories for Jinja2 templates and provides lookup by integration key.
 """
 
 from pathlib import Path
@@ -22,11 +21,11 @@ class TemplateRegistry:
         Initialize the TemplateRegistry.
 
         Args:
-            base_dirs (List[Path]): List of directories where each directory’s
-                name represents the integration key (e.g., 'fastapi', 'django').
-                Each base_dir is scanned recursively for .j2 files.
-            ignore_hidden (bool): If True, skip files or folders whose names
-                start with a dot ('.'). Defaults to True.
+            base_dirs (List[Path]): Directories where each directory’s name represents
+                the integration key (e.g., 'fastapi', 'django'). Each directory is
+                scanned recursively for .j2 files.
+            ignore_hidden (bool): If True, skip files or folders whose names start
+                with a dot ('.'). Defaults to True.
         """
         self.templates: Dict[str, List[Path]] = {}
         self.ignore_hidden = ignore_hidden
@@ -54,7 +53,7 @@ class TemplateRegistry:
         Return a sorted list of integration keys that have at least one template.
 
         Returns:
-            List[str]: e.g., ["fastapi", "django", "aws_cdk"]
+            List[str]: Integration names, e.g., ["fastapi", "django", "aws_cdk"].
         """
         return sorted(self.templates.keys())
 
@@ -66,7 +65,7 @@ class TemplateRegistry:
             integration (str): The integration name (key) to query.
 
         Returns:
-            List[Path]: List of Path objects pointing to .j2 files.
+            List[Path]: Paths to .j2 template files.
 
         Raises:
             KeyError: If the integration key is not registered.
@@ -81,14 +80,15 @@ class TemplateRegistry:
 
         Args:
             integration (str): The integration name (key) to search in.
-            template_name (str): The exact filename of the template (e.g., "models_template.j2").
+            template_name (str): Exact filename of the template
+                (e.g., "models_template.j2").
 
         Returns:
-            Path: The full Path to the matching template file.
+            Path: Full path to the matching template file.
 
         Raises:
             KeyError: If the integration key is not registered.
-            FileNotFoundError: If no template with the given name is found under that integration.
+            FileNotFoundError: If no matching template is found under that integration.
         """
         if integration not in self.templates:
             raise KeyError(f"No templates registered for integration '{integration}'")

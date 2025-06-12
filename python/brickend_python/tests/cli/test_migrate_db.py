@@ -1,5 +1,14 @@
 """
-test_migrate_db.py - Fixed version that handles the new file structure
+test_migrate_db.py
+
+Unit tests for the 'migrate db' CLI command in brickend_cli.main,
+adapted for the new FastAPI app structure with app/ and migrations/ directories.
+
+This module covers:
+  - Initial Alembic revision creation and database upgrade.
+  - Generating a second migration after model changes.
+  - Handling no-change scenarios (no new revisions).
+  - Debugging the migration import environment.
 """
 
 import shutil
@@ -17,6 +26,13 @@ def project_dir(tmp_path, monkeypatch):
     """
     Create a temporary project directory using the FastAPI skeleton,
     then customize it for migration testing with the correct file structure.
+
+    Args:
+        tmp_path (Path): pytest-provided temporary directory.
+        monkeypatch: pytest fixture for modifying the working directory.
+
+    Returns:
+        Path: Path to the prepared project directory with app/ and migrations/ set up.
     """
     # Find the project root and skeleton directory
     repo_root = Path(__file__).parents[2]

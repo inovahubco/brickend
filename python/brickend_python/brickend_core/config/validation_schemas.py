@@ -23,9 +23,7 @@ ALLOWED_FIELD_TYPES = {
 
 
 class FieldConfig(BaseModel):
-    """
-    Represents a single field in an entity definition.
-    """
+    """Represents a single field in an entity definition."""
 
     name: str
     type: str
@@ -39,9 +37,7 @@ class FieldConfig(BaseModel):
     @field_validator("type")
     @classmethod
     def validate_type(cls, v: str) -> str:
-        """
-        Ensure that the 'type' is one of the ALLOWED_FIELD_TYPES.
-        """
+        """Ensure that `type` is one of the allowed field types."""
         if v not in ALLOWED_FIELD_TYPES:
             allowed = ", ".join(sorted(ALLOWED_FIELD_TYPES))
             raise ValueError(f"Invalid field type '{v}'. Must be one of: {allowed}")
@@ -50,10 +46,7 @@ class FieldConfig(BaseModel):
     @field_validator("name")
     @classmethod
     def validate_field_name(cls, v: str) -> str:
-        """
-        Ensure that the field name follows a simple snake_case pattern:
-        starts with a letter and contains only letters, numbers, or underscores.
-        """
+        """Ensure `name` follows snake_case: starts with a letter, uses letters, digits, or underscores."""
         if not re.match(r"^[A-Za-z][A-Za-z0-9_]*$", v):
             raise ValueError(
                 "Field name must start with a letter and contain only letters, digits, or underscores."
@@ -62,9 +55,7 @@ class FieldConfig(BaseModel):
 
 
 class EntityConfig(BaseModel):
-    """
-    Represents a single entity definition, which has a name and a list of fields.
-    """
+    """Represents a single entity definition with a name and its fields."""
 
     name: str
     fields: List[FieldConfig]
@@ -72,10 +63,7 @@ class EntityConfig(BaseModel):
     @field_validator("name")
     @classmethod
     def validate_entity_name(cls, v: str) -> str:
-        """
-        Ensure that the entity name follows a PascalCase or simple CamelCase pattern:
-        starts with a letter and contains only letters, numbers, or underscores.
-        """
+        """Ensure `name` follows PascalCase or CamelCase: starts with a letter, uses letters, digits, or underscores."""
         if not re.match(r"^[A-Za-z][A-Za-z0-9_]*$", v):
             raise ValueError(
                 "Entity name must start with a letter and contain only letters, digits, or underscores."
@@ -85,28 +73,21 @@ class EntityConfig(BaseModel):
     @field_validator("fields")
     @classmethod
     def validate_fields_non_empty(cls, v: List[FieldConfig]) -> List[FieldConfig]:
-        """
-        Ensure that each entity has at least one field defined.
-        """
-        if len(v) == 0:
+        """Ensure that at least one field is defined for the entity."""
+        if not v:
             raise ValueError("Each entity must have at least one field defined.")
         return v
 
 
 class EntitiesFile(BaseModel):
-    """
-    Represents the top-level structure of the YAML/JSON file.
-    Must contain a list of EntityConfig objects under the 'entities' key.
-    """
+    """Represents the top-level structure of the entities file, requiring at least one entity."""
 
     entities: List[EntityConfig]
 
     @field_validator("entities")
     @classmethod
     def validate_entities_non_empty(cls, v: List[EntityConfig]) -> List[EntityConfig]:
-        """
-        Ensure that the file contains at least one entity.
-        """
-        if len(v) == 0:
+        """Ensure that the `entities` list contains at least one entity."""
+        if not v:
             raise ValueError("The 'entities' list must contain at least one entity.")
         return v

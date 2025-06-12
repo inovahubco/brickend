@@ -1,5 +1,14 @@
 """
 generate_code.py
+
+CLI command to generate application code for a specified integration based on entity definitions.
+
+This module provides a Typer command (`generate_code`) that:
+  - Loads and validates entities definitions from a YAML file.
+  - Builds a rendering context via `ContextBuilder`.
+  - Locates the project root and integration templates.
+  - Configures `TemplateRegistry` and `TemplateEngine`.
+  - Generates the project scaffold into the specified output directory.
 """
 
 import typer
@@ -16,20 +25,21 @@ app = typer.Typer(add_completion=False)
 
 
 def find_project_root() -> Path:
-    """
-    Find the project root by looking for brickend_core directory.
-    This is more robust than using hardcoded parent levels.
+    """Locate the project root by searching for a `brickend_core` directory in parent paths.
+
+    Returns:
+        Path: Path to the directory containing `brickend_core`.
+
+    Raises:
+        FileNotFoundError: If no `brickend_core` directory is found in the current path or its ancestors.
     """
     current = Path(__file__).resolve()
-
     for parent in [current] + list(current.parents):
-        brickend_core = parent / "brickend_core"
-        if brickend_core.exists() and brickend_core.is_dir():
+        if (parent / "brickend_core").is_dir():
             return parent
 
     cwd = Path.cwd()
-    brickend_core = cwd / "brickend_core"
-    if brickend_core.exists() and brickend_core.is_dir():
+    if (cwd / "brickend_core").is_dir():
         return cwd
 
     raise FileNotFoundError("Could not find project root with brickend_core directory")
@@ -50,9 +60,16 @@ def generate_code(
         "", "--db-url", help="Database URL for db.py (e.g., 'sqlite:///./test.db')"
     ),
 ) -> None:
-    """
-    Generate code (models, schemas, CRUD, routers, main, db) for the specified
-    integration using the entities defined in entities.yaml.
+    """Generate code (models, schemas, CRUD, routers, main, db) for a given integration.
+
+    Args:
+        entities_path (Path): Path to the `entities.yaml` file defining your entities.
+        output_dir (Path): Directory where generated code will be written.
+        integration (str): Integration key to select templates (e.g., 'fastapi').
+        database_url (Optional[str]): Database URL to include in generated `database.py`.
+
+    Raises:
+        typer.Exit: If any step fails, exits with a non-zero status after printing an error.
     """
     try:
         raw = load_entities(entities_path)
@@ -73,7 +90,7 @@ def generate_code(
     if database_url:
         context["database_url"] = database_url
     else:
-        typer.echo("Warning: No database_url provided; db.py may be incomplete.")
+        typer.echo("Warning: No database_url provided; generated `database.py` may require manual update.")
 
     try:
         project_root = find_project_root()
@@ -82,9 +99,8 @@ def generate_code(
         raise typer.Exit(code=1)
 
     templates_base = project_root / "brickend_core" / "integrations" / "back"
-
     integration_dir = templates_base / integration
-    if not integration_dir.exists() or not integration_dir.is_dir():
+    if not integration_dir.is_dir():
         typer.echo(f"Generation error: Integration '{integration}' not found.")
         raise typer.Exit(code=1)
 
@@ -100,11 +116,8 @@ def generate_code(
     try:
         generator = CodeGenerator(engine, registry, output_dir)
         generator.generate_project(context, integration)
-    except ValueError as ve:
-        typer.echo(f"Generation error: {ve}")
-        raise typer.Exit(code=1)
-    except FileNotFoundError as fnf:
-        typer.echo(f"Generation error: {fnf}")
+    except (ValueError, FileNotFoundError) as gen_err:
+        typer.echo(f"Generation error: {gen_err}")
         raise typer.Exit(code=1)
     except Exception as e:
         typer.echo(f"Unexpected error during generation: {e}")

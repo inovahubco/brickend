@@ -58,7 +58,9 @@ class CodeGenerator:
         self.template_registry = template_registry
         self.output_dir = output_dir
         self.preserve_protected_regions = preserve_protected_regions
-        self.protected_handler = SmartProtectedRegionsHandler() if preserve_protected_regions else None
+        self.protected_handler = (
+            SmartProtectedRegionsHandler() if preserve_protected_regions else None
+        )
 
     def generate_project(self, context: Dict[str, Any], integration_key: str) -> None:
         """
@@ -70,12 +72,12 @@ class CodeGenerator:
           3. Render each template with the given context.
           4. Preserve any protected regions from existing files.
           5. Write rendered content to files under output_dir/app/:
-             - app/models.py (single file with all entities)
-             - app/schemas.py (single file with all entities)
-             - app/crud/{entity}_crud.py files (one per entity)
-             - app/routers/{entity}_router.py files (one per entity)
-             - app/main.py (single file importing all routers)
-             - app/database.py (single file)
+             - app/models.py
+             - app/schemas.py
+             - app/crud/{entity}_crud.py (one per entity)
+             - app/routers/{entity}_router.py (one per entity)
+             - app/main.py
+             - app/database.py
 
         Args:
             context (Dict[str, Any]): Context dictionary from ContextBuilder.
@@ -91,8 +93,7 @@ class CodeGenerator:
         except KeyError:
             raise ValueError(f"Integration '{integration_key}' not found in TemplateRegistry.")
 
-        template_map: Dict[str, Path] = {path.name: path for path in template_paths}
-
+        template_map = {path.name: path for path in template_paths}
         required_templates = [
             self.MODELS_TEMPLATE,
             self.SCHEMAS_TEMPLATE,
@@ -115,12 +116,10 @@ class CodeGenerator:
         try:
             # Generate single-file templates (models, schemas, main, database)
             self._generate_single_file_templates(context)
-
             # Generate per-entity templates (crud, routers)
             self._generate_per_entity_templates(context)
-
-        except FileNotFoundError as fnf:
-            raise fnf
+        except FileNotFoundError:
+            raise
         except Exception as e:
             raise OSError(f"Failed to generate project files: {e}")
 
@@ -128,48 +127,21 @@ class CodeGenerator:
         """
         Generate templates that create single files containing all entities.
 
-        All files are generated inside app/ directory to match the import structure
-        expected by the templates.
-
         Args:
             context (Dict[str, Any]): Context dictionary with entities list.
         """
-        # Create app/ directory structure
         app_dir = self.output_dir / "app"
         app_dir.mkdir(parents=True, exist_ok=True)
-
-        # Create __init__.py to make app a Python package
         (app_dir / "__init__.py").write_text("", encoding="utf-8")
 
-        # Generate all files inside app/ directory
-
-        # app/models.py - single file with all entity models
-        self._generate_and_write_file(
-            self.MODELS_TEMPLATE,
-            context,
-            app_dir / self.MODELS_FILENAME
-        )
-
-        # app/schemas.py - single file with all entity schemas
-        self._generate_and_write_file(
-            self.SCHEMAS_TEMPLATE,
-            context,
-            app_dir / self.SCHEMAS_FILENAME
-        )
-
-        # app/main.py - single file importing all routers
-        self._generate_and_write_file(
-            self.MAIN_TEMPLATE,
-            context,
-            app_dir / self.MAIN_FILENAME
-        )
-
-        # app/database.py - single database configuration file
-        self._generate_and_write_file(
-            self.DB_TEMPLATE,
-            context,
-            app_dir / self.DATABASE_FILENAME
-        )
+        # models.py
+        self._generate_and_write_file(self.MODELS_TEMPLATE, context, app_dir / self.MODELS_FILENAME)
+        # schemas.py
+        self._generate_and_write_file(self.SCHEMAS_TEMPLATE, context, app_dir / self.SCHEMAS_FILENAME)
+        # main.py
+        self._generate_and_write_file(self.MAIN_TEMPLATE, context, app_dir / self.MAIN_FILENAME)
+        # database.py
+        self._generate_and_write_file(self.DB_TEMPLATE, context, app_dir / self.DATABASE_FILENAME)
 
     def _generate_per_entity_templates(self, context: Dict[str, Any]) -> None:
         """
@@ -178,17 +150,11 @@ class CodeGenerator:
         Args:
             context (Dict[str, Any]): Context dictionary with entities list.
         """
-        entities = context.get('entities', [])
-
+        entities = context.get("entities", [])
         for entity in entities:
-            # Create entity-specific context
             entity_context = context.copy()
-            entity_context['entity'] = entity
-
-            # Generate CRUD file for this entity
+            entity_context["entity"] = entity
             self._generate_entity_crud_file(entity_context, entity)
-
-            # Generate Router file for this entity
             self._generate_entity_router_file(entity_context, entity)
 
     def _generate_entity_crud_file(self, entity_context: Dict[str, Any], entity: Dict[str, Any]) -> None:
@@ -199,22 +165,12 @@ class CodeGenerator:
             entity_context (Dict[str, Any]): Context with 'entity' key added.
             entity (Dict[str, Any]): The specific entity data.
         """
-        # Create app/crud directory structure
         crud_dir = self.output_dir / "app" / "crud"
         crud_dir.mkdir(parents=True, exist_ok=True)
-
-        # Create __init__.py to make crud a Python package
         (crud_dir / "__init__.py").write_text("", encoding="utf-8")
 
-        # Generate and write entity-specific CRUD file
-        crud_filename = f"{entity['names']['snake']}_crud.py"
-        crud_path = crud_dir / crud_filename
-
-        self._generate_and_write_file(
-            self.CRUD_TEMPLATE,
-            entity_context,
-            crud_path
-        )
+        filename = f"{entity['names']['snake']}_crud.py"
+        self._generate_and_write_file(self.CRUD_TEMPLATE, entity_context, crud_dir / filename)
 
     def _generate_entity_router_file(self, entity_context: Dict[str, Any], entity: Dict[str, Any]) -> None:
         """
@@ -224,22 +180,12 @@ class CodeGenerator:
             entity_context (Dict[str, Any]): Context with 'entity' key added.
             entity (Dict[str, Any]): The specific entity data.
         """
-        # Create app/routers directory structure
         routers_dir = self.output_dir / "app" / "routers"
         routers_dir.mkdir(parents=True, exist_ok=True)
-
-        # Create __init__.py to make routers a Python package
         (routers_dir / "__init__.py").write_text("", encoding="utf-8")
 
-        # Generate and write entity-specific Router file
-        router_filename = f"{entity['names']['snake']}_router.py"
-        router_path = routers_dir / router_filename
-
-        self._generate_and_write_file(
-            self.ROUTER_TEMPLATE,
-            entity_context,
-            router_path
-        )
+        filename = f"{entity['names']['snake']}_router.py"
+        self._generate_and_write_file(self.ROUTER_TEMPLATE, entity_context, routers_dir / filename)
 
     def _generate_and_write_file(self, template_name: str, context: Dict[str, Any], output_path: Path) -> None:
         """
@@ -250,19 +196,11 @@ class CodeGenerator:
             context (Dict[str, Any]): Context for template rendering.
             output_path (Path): Path where the file should be written.
         """
-        # Render the template
-        rendered_content = self.template_engine.render_to_string(template_name, context)
-
-        # Preserve protected regions if enabled
+        rendered = self.template_engine.render_to_string(template_name, context)
         if self.preserve_protected_regions and self.protected_handler:
-            rendered_content = self.protected_handler.preserve_protected_regions(
-                output_path,
-                rendered_content
-            )
-
-        # Write the file
-        output_path.parent.mkdir(parents=True, exist_ok=True)  # Ensure parent directories exist
-        output_path.write_text(rendered_content, encoding="utf-8")
+            rendered = self.protected_handler.preserve_protected_regions(output_path, rendered)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(rendered, encoding="utf-8")
 
     def disable_protected_regions(self) -> None:
         """Disable protected regions preservation for this generator."""

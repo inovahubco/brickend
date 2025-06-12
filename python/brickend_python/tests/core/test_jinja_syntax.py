@@ -1,8 +1,8 @@
 """
 test_jinja_syntax.py
 
-Ensure that each Jinja2 template in brickend_core/integrations/back/fastapi/ compiles
-without syntax errors.
+Unit tests for verifying that all Jinja2 templates in the FastAPI integration
+compile without syntax errors.
 """
 
 import pytest
@@ -16,8 +16,16 @@ TEMPLATES_DIR = Path("brickend_core/integrations/back/fastapi")
 @pytest.mark.parametrize("tpl_path", list(TEMPLATES_DIR.rglob("*.j2")))
 def test_jinja_syntax(tpl_path: Path):
     """
-    Load each .j2 template under brickend_core/integrations/back/fastapi/
-    and verify it compiles without raising TemplateSyntaxError.
+    Ensure a given Jinja2 template compiles without syntax errors.
+
+    This test loads the template using Jinja2's Environment and FileSystemLoader,
+    and fails if a TemplateSyntaxError is raised during compilation.
+
+    Args:
+        tpl_path (Path): Path to the .j2 template file to validate.
+
+    Raises:
+        AssertionError: If compiling tpl_path raises a TemplateSyntaxError.
     """
     loader = FileSystemLoader(str(tpl_path.parent))
     env = Environment(loader=loader)

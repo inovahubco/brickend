@@ -1,9 +1,13 @@
 """
 test_generate_code.py
 
-Integration tests for the 'generate code' CLI command in cli.commands.generate_code.
-Updated to match the new file structure where CRUD and Router files are generated
-per-entity in app/crud/ and app/routers/ directories, and single files live under app/.
+Integration tests for the 'generate code' CLI command in brickend_cli.main.
+This test suite verifies the `generate code` command:
+  - Successful generation with single and multiple entities.
+  - Proper error handling when entities.yaml is missing.
+  - Error when integration key is invalid.
+  - Correct directory and file structure.
+  - Content validation of generated files.
 """
 
 import pytest
@@ -16,6 +20,9 @@ from brickend_cli.main import app
 def write_minimal_entities_yaml(path: Path) -> None:
     """
     Write a minimal entities.yaml with one entity 'User' having two fields: 'id' and 'email'.
+
+    Args:
+        path (Path): Path where the YAML file will be created.
     """
     content = """
     entities:
@@ -37,6 +44,9 @@ def write_minimal_entities_yaml(path: Path) -> None:
 def write_multi_entities_yaml(path: Path) -> None:
     """
     Write an entities.yaml with multiple entities for testing.
+
+    Args:
+        path (Path): Path where the YAML file will be created.
     """
     content = """
     entities:
@@ -69,7 +79,10 @@ def write_multi_entities_yaml(path: Path) -> None:
 def ensure_clean_fastapi_templates(tmp_path, monkeypatch):
     """
     Ensure that the CLI picks up a valid fastapi integration directory.
-    If tests run from a different CWD, monkeypatch the project_root accordingly.
+
+    Args:
+        tmp_path: Temporary path for the test workspace.
+        monkeypatch: Fixture to modify environment (cwd).
     """
     real_project_root = Path(__file__).parents[2]
     fastapi_dir = real_project_root / "brickend_core" / "integrations" / "back" / "fastapi"
@@ -81,12 +94,10 @@ def ensure_clean_fastapi_templates(tmp_path, monkeypatch):
 
 def test_generate_code_success(tmp_path):
     """
-    Given a valid entities.yaml and the default 'fastapi' integration,
-    the CLI should generate code files successfully under the specified output directory.
+    Validate that code generation succeeds for a single-entity definition.
 
-    Expected structure under app/:
-    - models.py, schemas.py, main.py, database.py
-    - Per-entity files: app/crud/{entity}_crud.py, app/routers/{entity}_router.py
+    Args:
+        tmp_path: Temporary path for the test workspace.
     """
     runner = CliRunner()
     entities_file = tmp_path / "entities.yaml"
@@ -131,7 +142,6 @@ def test_generate_code_success(tmp_path):
     # Verify content in CRUD
     crud_content = user_crud_path.read_text(encoding="utf-8")
     assert "def get_user(" in crud_content, "get_user function should be in user_crud.py"
-    # import line may be 'from app.models import User'
     assert (
         "from app.models import User" in crud_content
         or "from app.models.user import User" in crud_content
@@ -140,7 +150,10 @@ def test_generate_code_success(tmp_path):
 
 def test_generate_code_multiple_entities(tmp_path):
     """
-    Test code generation with multiple entities to ensure proper file structure.
+    Validate code generation for multiple entities.
+
+    Args:
+        tmp_path: Temporary path for the test workspace.
     """
     runner = CliRunner()
     entities_file = tmp_path / "entities.yaml"
@@ -177,7 +190,10 @@ def test_generate_code_multiple_entities(tmp_path):
 
 def test_generate_code_missing_entities(tmp_path):
     """
-    If entities.yaml does not exist, the CLI should exit with an error and message indicating the missing file.
+    Validate error when entities.yaml is missing.
+
+    Args:
+        tmp_path: Temporary path for the test workspace.
     """
     runner = CliRunner()
     missing_file = tmp_path / "nonexistent_entities.yaml"
@@ -204,8 +220,10 @@ def test_generate_code_missing_entities(tmp_path):
 
 def test_generate_code_invalid_integration(tmp_path):
     """
-    If the integration key passed is not found under core/integrations/back/,
-    the CLI should exit with an error indicating integration not found.
+    Validate error when integration key is invalid.
+
+    Args:
+        tmp_path: Temporary path for the test workspace.
     """
     runner = CliRunner()
     entities_file = tmp_path / "entities.yaml"
@@ -235,7 +253,10 @@ def test_generate_code_invalid_integration(tmp_path):
 
 def test_generate_code_file_structure(tmp_path):
     """
-    Test that the correct directory structure is created.
+    Validate that the correct directory structure is created.
+
+    Args:
+        tmp_path: Temporary path for the test workspace.
     """
     runner = CliRunner()
     entities_file = tmp_path / "entities.yaml"
@@ -271,7 +292,10 @@ def test_generate_code_file_structure(tmp_path):
 
 def test_generate_code_content_validation(tmp_path):
     """
-    Test that generated files contain expected content patterns.
+    Validate content patterns in generated files.
+
+    Args:
+        tmp_path: Temporary path for the test workspace.
     """
     runner = CliRunner()
     entities_file = tmp_path / "entities.yaml"

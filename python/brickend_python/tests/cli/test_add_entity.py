@@ -1,10 +1,10 @@
 """
 test_add_entity.py
 
-Unit tests for the 'add_entity entity' CLI command in cli.commands.add_entity.
+Unit tests for the 'add_entity entity' CLI command in brickend_cli.main.
 Covers:
-  1. Adding a single entity to an empty entities.yaml.
-  2. Adding a second entity with a foreign key to an existing entity.
+  - Adding a single entity to an empty entities.yaml.
+  - Adding a second entity with a foreign key to an existing entity.
 """
 
 import pytest
@@ -18,6 +18,9 @@ from brickend_cli.main import app as cli_app
 def write_empty_entities_yaml(path: Path) -> None:
     """
     Create an entities.yaml file with an empty 'entities' list.
+
+    Args:
+        path (Path): Path where entities.yaml will be created.
     """
     content = {"entities": []}
     yaml = ruamel.yaml.YAML()
@@ -30,6 +33,10 @@ def change_to_tmp_dir(tmp_path, monkeypatch):
     """
     Change cwd to a temporary directory for each test,
     and ensure an empty entities.yaml exists.
+
+    Args:
+        tmp_path: pytest fixture for a temporary directory.
+        monkeypatch: pytest fixture for patching.
     """
     monkeypatch.chdir(tmp_path)
     entities_file = tmp_path / "entities.yaml"
@@ -46,7 +53,6 @@ def test_add_single_entity(monkeypatch):
     Verify that entities.yaml is updated correctly.
     """
     runner = CliRunner()
-
     inputs = iter([
         "User",      # Entity name (PascalCase)
         "2",         # Number of fields
@@ -55,7 +61,6 @@ def test_add_single_entity(monkeypatch):
         "uuid",      # field_type
         "y",         # primary_key?
         "n",         # unique?
-        # (primary key => nullable=False automatically; no prompt)
         "",          # default
         "",          # foreign_key
         "",          # constraints
@@ -126,26 +131,12 @@ def test_add_second_entity_with_foreign_key(monkeypatch):
     """
     runner = CliRunner()
 
+    # First call inputs
     inputs1 = iter([
         "User",  # Entity name
         "2",     # Number of fields
-        # id field
-        "id",
-        "uuid",
-        "y",
-        "n",
-        "",      # default
-        "",      # foreign_key
-        "",      # constraints
-        # email field
-        "email",
-        "string",
-        "n",
-        "y",
-        "n",
-        "",
-        "",
-        "",
+        "id", "uuid", "y", "n", "", "", "",
+        "email", "string", "n", "y", "n", "", "", "",
     ])
 
     def fake_prompt1(prompt_text: str, default: str = ""):
@@ -155,35 +146,12 @@ def test_add_second_entity_with_foreign_key(monkeypatch):
     result1 = runner.invoke(cli_app, ["add_entity", "entity"])
     assert result1.exit_code == 0, f"First CLI call failed: {result1.stdout}\n{result1.stderr}"
 
+    # Second call inputs
     inputs2 = iter([
-        "Post",   # Entity name
-        "3",      # Number of fields
-        # Field 1: id
-        "id",
-        "uuid",
-        "y",
-        "n",
-        "",       # default
-        "",       # foreign_key
-        "",       # constraints
-        # Field 2: title
-        "title",
-        "string",
-        "n",
-        "n",
-        "n",
-        "",       # default
-        "",       # foreign_key
-        "",       # constraints
-        # Field 3: user_id
-        "user_id",
-        "uuid",
-        "n",
-        "n",
-        "n",
-        "",                           # default
-        "User.id",                    # foreign_key
-        "index, not null",            # constraints (two constraints: "index", "not null")
+        "Post", "3",
+        "id", "uuid", "y", "n", "", "", "",
+        "title", "string", "n", "n", "n", "", "", "",
+        "user_id", "uuid", "n", "n", "n", "", "User.id", "index, not null",
     ])
 
     def fake_prompt2(prompt_text: str, default: str = ""):

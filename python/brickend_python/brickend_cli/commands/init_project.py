@@ -1,5 +1,11 @@
 """
 init_project.py
+
+CLI command to initialize a new Brickend project based on provided skeleton templates.
+
+This module provides:
+  - find_project_root: locate the 'templates/skeletons' directory.
+  - init_project: Typer command to copy the chosen skeleton into a new project folder.
 """
 
 import shutil
@@ -7,24 +13,27 @@ from pathlib import Path
 
 import typer
 
-
 app = typer.Typer(add_completion=False)
 
 
 def find_project_root() -> Path:
-    """
-    Find the project root by looking for the 'templates/skeletons' directory.
-    Traverse upwards from this file until found; otherwise, check cwd.
-    Raises FileNotFoundError if not found.
+    """Locate the project root by finding the 'templates/skeletons' directory.
+
+    Returns:
+        Path: Directory path containing 'templates/skeletons'.
+
+    Raises:
+        FileNotFoundError: If no 'templates/skeletons' directory is found
+            in current or ancestor paths.
     """
     current = Path(__file__).resolve()
     for parent in [current] + list(current.parents):
         candidate = parent / "templates" / "skeletons"
-        if candidate.exists() and candidate.is_dir():
+        if candidate.is_dir():
             return parent
 
     cwd = Path.cwd()
-    if (cwd / "templates" / "skeletons").exists():
+    if (cwd / "templates" / "skeletons").is_dir():
         return cwd
 
     raise FileNotFoundError("Could not find project root with 'templates/skeletons' directory")
@@ -37,9 +46,16 @@ def init_project(
         "fastapi", "--type", "-t", help="Skeleton type: fastapi, django, pulumi"
     ),
 ) -> None:
-    """
-    Initialize a new Brickend project of the given type by copying
-    the corresponding skeleton folder into a new directory named 'name'.
+    """Create a new Brickend project directory from a skeleton template.
+
+    Args:
+        name (str): Name of the directory to create for the new project.
+        project_type (str): Skeleton template type to use
+            (e.g., 'fastapi', 'django', 'pulumi').
+
+    Raises:
+        typer.Exit: If the project root cannot be located, the specified skeleton
+            does not exist, the target directory already exists, or copying fails.
     """
     try:
         project_root = find_project_root()
@@ -49,8 +65,7 @@ def init_project(
 
     skeletons_root = project_root / "templates" / "skeletons"
     chosen_skeleton = skeletons_root / project_type
-
-    if not chosen_skeleton.exists() or not chosen_skeleton.is_dir():
+    if not chosen_skeleton.is_dir():
         typer.echo(f"Error: No skeleton found for type '{project_type}'.")
         raise typer.Exit(code=1)
 

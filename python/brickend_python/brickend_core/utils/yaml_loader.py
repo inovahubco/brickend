@@ -1,7 +1,8 @@
 """
 yaml_loader.py
 
-Loads an entities YAML file and validates it using Pydantic schemas defined in core.config.validation_schemas.
+Load and validate an entities YAML file using Pydantic schemas defined in
+brickend_core.config.validation_schemas.
 """
 
 from pathlib import Path
@@ -15,16 +16,16 @@ from brickend_core.config.validation_schemas import EntitiesFile
 
 def load_entities(path: Path) -> Dict[str, Any]:
     """
-    Load and validate an entities YAML file using Pydantic.
+    Load and validate an entities YAML file.
 
     Steps:
-    1. Verify that the given path exists.
-    2. Parse the YAML content into a Python dict.
-    3. Use EntitiesFile.parse_obj(...) to validate the structure and field constraints.
-    4. Return the validated dictionary representation.
+      1. Verify that the given path exists.
+      2. Parse the YAML content into a Python dict.
+      3. Validate structure and constraints via EntitiesFile.
+      4. Return the validated dictionary representation.
 
     Args:
-        path (Path): Path to the YAML file that defines entities.
+        path (Path): Path to the YAML file defining entities.
 
     Returns:
         Dict[str, Any]: The validated content as a Python dict.

@@ -18,7 +18,7 @@ class TemplateEngine:
     render them to strings, and write rendered content to disk.
     """
 
-    def __init__(self, template_dirs: List[Path], auto_reload: bool = False):
+    def __init__(self, template_dirs: List[Path], auto_reload: bool = False) -> None:
         """
         Initialize the TemplateEngine.
 
@@ -55,12 +55,12 @@ class TemplateEngine:
         """
         Render a template with the given context and write the output to a file.
 
-        If necessary, this method creates parent directories of the destination path.
+        This method will create parent directories of the destination path if they do not exist.
 
         Args:
             template_name (str): The filename of the template (e.g., "router_template.j2").
             context (Dict[str, Any]): Mapping of variable names to values for rendering.
-            destination (Path): The full path (including filename) where rendered output will be written.
+            destination (Path): Full path (including filename) where rendered output will be written.
 
         Raises:
             jinja2.TemplateNotFound: If the template file cannot be found.

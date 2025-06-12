@@ -2,10 +2,12 @@
 test_code_generator.py
 
 Unit tests for CodeGenerator in brickend_core.engine.code_generator.
-Covers:
-  1. Successful generation of project files for a valid context and FastAPI integration.
-  2. ValueError when integration key is not registered.
-  3. FileNotFoundError when a required template is missing.
+Tests cover:
+  - Successful generation of project files for a valid context and FastAPI integration.
+  - ValueError when integration key is not registered.
+  - FileNotFoundError when a required template is missing.
+  - Behavior when protected regions are disabled.
+  - Verification of generated file structure and content.
 """
 
 import pytest
@@ -19,9 +21,16 @@ from brickend_core.engine.code_generator import CodeGenerator
 
 def make_simple_entities_dict() -> dict:
     """
-    Helper to create a minimal valid entities_dict for testing:
-    - One entity named 'User'
-    - Two fields: 'id' (uuid, primary_key=True) and 'email' (string, unique, nullable=False)
+    Helper to create a minimal valid entities dictionary for testing.
+
+    Creates:
+      - A single entity 'User'.
+      - Two fields:
+          * 'id': type 'uuid', primary_key=True, unique=False, nullable=False.
+          * 'email': type 'string', primary_key=False, unique=True, nullable=False.
+
+    Returns:
+        dict: Dictionary representing entities configuration.
     """
     return {
         "entities": [
@@ -56,8 +65,16 @@ def make_simple_entities_dict() -> dict:
 
 def make_multi_entities_dict() -> dict:
     """
-    Helper to create a multi-entity dict for testing:
-    - User and Post entities
+    Helper to create a multi-entity dictionary for testing.
+
+    Creates:
+      - Entities 'User' and 'Post'.
+      - Each entity with:
+          * 'id': type 'uuid', primary_key=True, unique=False, nullable=False.
+          * One additional string field ('email' for User, 'title' for Post).
+
+    Returns:
+        dict: Dictionary representing multiple entities' configuration.
     """
     return {
         "entities": [
@@ -117,10 +134,18 @@ def make_multi_entities_dict() -> dict:
 
 def test_generate_project_success(tmp_path):
     """
-    Given a valid context and the 'fastapi' integration, CodeGenerator.generate_project
-    should create the correct file structure:
-    - Single files under app/: models.py, schemas.py, main.py, database.py
-    - Per-entity files: app/crud/{entity}_crud.py, app/routers/{entity}_router.py
+    Test that CodeGenerator.generate_project creates the correct project structure and files.
+
+    Scenario:
+      - Given a valid entities dictionary for one entity.
+      - Using 'fastapi' integration and a SQLite database URL.
+    Verifies:
+      - Presence of models.py, schemas.py, main.py, database.py in app/.
+      - Presence of user_crud.py in app/crud/ and user_router.py in app/routers/.
+      - Content checks for class definitions and imports.
+
+    Args:
+        tmp_path (Path): Temporary directory fixture for output.
     """
     entities_dict = make_simple_entities_dict()
     builder = ContextBuilder()
@@ -179,7 +204,18 @@ def test_generate_project_success(tmp_path):
 
 def test_generate_project_multiple_entities(tmp_path):
     """
-    Test generation with multiple entities to ensure each gets its own CRUD and Router files.
+    Test generation of CRUD and router files for multiple entities.
+
+    Scenario:
+      - Entities 'User' and 'Post'.
+    Verifies:
+      - app/crud/user_crud.py and post_crud.py exist.
+      - app/routers/user_router.py and post_router.py exist.
+      - models.py includes both User and Post classes.
+      - main.py imports both routers.
+
+    Args:
+        tmp_path (Path): Temporary directory fixture for output.
     """
     entities_dict = make_multi_entities_dict()
     builder = ContextBuilder()
@@ -217,8 +253,15 @@ def test_generate_project_multiple_entities(tmp_path):
 
 def test_generate_project_invalid_integration(tmp_path):
     """
-    If the integration key is not registered in the TemplateRegistry,
-    generate_project should raise a ValueError.
+    Test error when integration key is not registered.
+
+    Scenario:
+      - Using integration 'nonexistent'.
+    Verifies:
+      - CodeGenerator.generate_project raises ValueError with appropriate message.
+
+    Args:
+        tmp_path (Path): Temporary directory fixture.
     """
     entities_dict = make_simple_entities_dict()
     builder = ContextBuilder()
@@ -241,8 +284,15 @@ def test_generate_project_invalid_integration(tmp_path):
 
 def test_generate_project_missing_template(tmp_path):
     """
-    If a required template (e.g., models_template.j2) is missing,
-    generate_project should raise a FileNotFoundError.
+    Test error when a required template file is missing.
+
+    Scenario:
+      - Remove 'models_template.j2' from templates directory.
+    Verifies:
+      - CodeGenerator.generate_project raises FileNotFoundError mentioning the missing template.
+
+    Args:
+        tmp_path (Path): Temporary directory fixture.
     """
     entities_dict = make_simple_entities_dict()
     builder = ContextBuilder()
@@ -273,7 +323,16 @@ def test_generate_project_missing_template(tmp_path):
 
 def test_generate_project_protected_regions_disabled(tmp_path):
     """
-    Test that CodeGenerator works correctly when protected regions are disabled.
+    Test generation with protected regions disabled.
+
+    Scenario:
+      - preserve_protected_regions=False.
+    Verifies:
+      - All expected files are generated.
+      - generator.preserve_protected_regions is False and protected_handler is None.
+
+    Args:
+        tmp_path (Path): Temporary directory fixture.
     """
     entities_dict = make_simple_entities_dict()
     builder = ContextBuilder()
@@ -301,6 +360,15 @@ def test_generate_project_protected_regions_disabled(tmp_path):
 def test_generate_project_file_structure(tmp_path):
     """
     Test that the generated file structure matches expectations.
+
+    Scenario:
+      - Single entity 'User'.
+    Verifies:
+      - Directories app/, app/crud/, app/routers/ exist.
+      - Specific files exist and are non-empty.
+
+    Args:
+        tmp_path (Path): Temporary directory fixture.
     """
     entities_dict = make_simple_entities_dict()
     builder = ContextBuilder()

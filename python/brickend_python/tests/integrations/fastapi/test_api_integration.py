@@ -1,5 +1,13 @@
 """
 test_api_integration.py
+
+Integration tests for the Brickend CLI and the generated FastAPI application.
+Covers:
+  - Project initialization via CLI (`brickend init project`).
+  - Code generation for entities and project structure.
+  - Verification of ContextBuilder import and output.
+  - Fallback manual FastAPI project creation.
+  - End-to-end CRUD operations using FastAPI TestClient.
 """
 
 import shutil
@@ -16,23 +24,29 @@ from brickend_cli.main import app as cli_app
 
 def create_correct_entities_yaml(project_dir):
     """
-    Create entities.yaml with the exact structure that ContextBuilder expects
+    Create a valid `entities.yaml` file that the ContextBuilder and code generator expect.
+
+    Args:
+        project_dir (Path): Directory where `entities.yaml` will be written.
+
+    Returns:
+        Path: Path to the created `entities.yaml` file.
     """
     entities_data = {
         "entities": [
             {
-                "name": "User",  # ContextBuilder uses this as original_name
+                "name": "User",
                 "fields": [
                     {
                         "name": "id",
-                        "type": "uuid",  # ContextBuilder maps this to UUID in TYPE_MAPPING
+                        "type": "uuid",
                         "primary_key": True,
                         "unique": True,
                         "nullable": False
                     },
                     {
                         "name": "email",
-                        "type": "string",  # ContextBuilder maps this to VARCHAR
+                        "type": "string",
                         "primary_key": False,
                         "unique": True,
                         "nullable": False
@@ -61,7 +75,14 @@ def create_correct_entities_yaml(project_dir):
 
 def test_context_builder():
     """
-    Test to verify that ContextBuilder works correctly
+    Verify ContextBuilder functionality for a basic entity definition.
+
+    - Attempts to import ContextBuilder.
+    - Builds a context for a simple 'User' entity.
+    - Prints and returns the context for inspection.
+
+    Returns:
+        dict or None: Generated context if successful, otherwise None.
     """
     try:
         from brickend_core.templates.context_builder import ContextBuilder
@@ -111,7 +132,17 @@ def test_context_builder():
 
 def create_manual_fastapi_project(project_dir):
     """
-    Create a FastAPI project manually
+    Manually construct a minimal FastAPI project as a fallback when `brickend init` fails.
+
+    - Creates `app/` directory structure.
+    - Writes `database.py` with SQLAlchemy setup.
+    - Writes `main.py` with example models, schemas, and CRUD endpoints.
+
+    Args:
+        project_dir (Path): Directory where the manual project will be assembled.
+
+    Returns:
+        Path: Path to the generated `main.py` file.
     """
     print("Creating FastAPI project manually...")
 
@@ -256,7 +287,20 @@ def read_root():
 @pytest.fixture
 def project(tmp_path, monkeypatch):
     """
-    Create a temporary Brickend project
+    Initialize a temporary Brickend project for integration testing.
+
+    Steps:
+      1. Change working directory to `tmp_path`.
+      2. Run `brickend init project` using the FastAPI skeleton.
+      3. If initialization fails, create a manual FastAPI project.
+      4. Create `entities.yaml` and generate code via CLI.
+
+    Args:
+        tmp_path (Path): Pytest temporary directory.
+        monkeypatch: Pytest fixture for modifying the environment.
+
+    Returns:
+        Path: Path to the prepared project directory.
     """
     runner = CliRunner()
 
@@ -348,11 +392,20 @@ def project(tmp_path, monkeypatch):
 
 def test_crud_endpoints(project):
     """
-    Test CRUD endpoints
+    Perform end-to-end CRUD tests against the generated FastAPI app.
+
+    Using TestClient:
+      1. Create a new user (POST `/users/`).
+      2. List users (GET `/users/`).
+      3. Retrieve user by ID (GET `/users/{user_id}`).
+      4. Delete user (DELETE `/users/{user_id}`).
+      5. Confirm 404 on repeated delete and get operations.
+
+    Args:
+        project (Path): Path to the project directory containing the FastAPI app.
     """
     print(f"\nStarting CRUD tests in {project}")
 
-    # Clean up any existing test database file
     test_db_file = project / "test_app.db"
     if test_db_file.exists():
         test_db_file.unlink()

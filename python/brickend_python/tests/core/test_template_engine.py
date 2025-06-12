@@ -1,8 +1,11 @@
 """
 test_template_engine.py
 
-Unit tests for the TemplateEngine class in core.engine.template_engine.
-Covers rendering to string and writing rendered output to a file.
+Unit tests for the TemplateEngine class in brickend_core.engine.template_engine.
+Covers:
+  - Rendering a Jinja2 template to a string.
+  - Writing rendered output to a file and creating parent directories.
+  - Error handling when a template is not found.
 """
 
 import pytest
@@ -13,7 +16,8 @@ from brickend_core.engine.template_engine import TemplateEngine
 def simple_template_dir(tmp_path):
     """
     Create a temporary directory with a single Jinja2 template for testing.
-    The template will be named 'greeting.j2' with content:
+
+    The template will be named 'greeting.j2' and contain:
         Hello, {{ name }}!
     """
     tpl_dir = tmp_path / "templates_test"
@@ -24,8 +28,10 @@ def simple_template_dir(tmp_path):
 
 def test_render_to_string(simple_template_dir):
     """
-    Given a template directory containing 'greeting.j2',
-    TemplateEngine.render_to_string should return the rendered text.
+    Test that TemplateEngine.render_to_string returns the correctly rendered text.
+
+    Given a template directory containing 'greeting.j2' with content "Hello, {{ name }}!",
+    calling render_to_string with context {"name": "Alice"} should return "Hello, Alice!".
     """
     engine = TemplateEngine([simple_template_dir], auto_reload=False)
     output = engine.render_to_string("greeting.j2", {"name": "Alice"})
@@ -35,9 +41,11 @@ def test_render_to_string(simple_template_dir):
 
 def test_render_to_file(simple_template_dir, tmp_path):
     """
-    Given a template directory with 'greeting.j2', render_to_file should:
-      1. Create the destination directory if it doesn't exist.
-      2. Write the rendered output to the specified file.
+    Test that TemplateEngine.render_to_file writes rendered output to the specified file.
+
+    Verifies:
+      1. The destination directory is created if it does not exist.
+      2. The rendered content "Hello, Bob!" is written to 'result.txt' under the output folder.
     """
     engine = TemplateEngine([simple_template_dir], auto_reload=False)
     destination = tmp_path / "output_folder" / "result.txt"
@@ -55,8 +63,10 @@ def test_render_to_file(simple_template_dir, tmp_path):
 
 def test_template_not_found(simple_template_dir):
     """
-    If the requested template name does not exist in any of the configured
-    template directories, TemplateEngine.render_to_string should raise a TemplateNotFound error.
+    Test that requesting a non-existent template raises a TemplateNotFound error.
+
+    Calling render_to_string with "nonexistent.j2" should raise an exception
+    mentioning that 'nonexistent.j2' could not be found.
     """
     engine = TemplateEngine([simple_template_dir], auto_reload=False)
     with pytest.raises(Exception) as exc_info:

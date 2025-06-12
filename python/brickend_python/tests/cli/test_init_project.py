@@ -1,11 +1,11 @@
 """
 test_init_project.py
 
-Unit tests for the 'init project' CLI command in cli.commands.init_command.
+Unit tests for the 'init project' CLI command in cli.commands.init_project.
 Covers:
-  1. Successful initialization of a fastapi skeleton.
-  2. Error when target folder already exists.
-  3. Error when skeleton type is invalid.
+  - Successful initialization of a fastapi skeleton.
+  - Error when target folder already exists.
+  - Error when skeleton type is invalid.
 """
 
 import pytest
@@ -20,6 +20,9 @@ def ensure_skeletons_exist(monkeypatch):
     """
     Ensure that the CLI can find the 'templates/skeletons/fastapi' folder
     by setting the working directory to the project root.
+
+    Args:
+        monkeypatch: pytest fixture to modify the working directory.
     """
     real_project_root = Path(__file__).parents[2]
     monkeypatch.chdir(real_project_root)
@@ -32,6 +35,9 @@ def test_init_project_success(tmp_path):
     """
     Given a valid skeleton type 'fastapi', init should create the target folder
     with expected files and directories.
+
+    Args:
+        tmp_path: Temporary directory provided by pytest.
     """
     runner = CliRunner()
 
@@ -70,6 +76,9 @@ def test_init_project_success(tmp_path):
 def test_init_project_folder_exists(tmp_path):
     """
     If the target folder already exists, init should exit with an error.
+
+    Args:
+        tmp_path: Temporary directory provided by pytest.
     """
     runner = CliRunner()
 
@@ -87,6 +96,9 @@ def test_init_project_folder_exists(tmp_path):
 def test_init_project_invalid_type(tmp_path):
     """
     If the skeleton type is invalid, init should exit with an error indicating missing skeleton.
+
+    Args:
+        tmp_path: Temporary directory provided by pytest.
     """
     runner = CliRunner()
 

@@ -2,9 +2,9 @@
 naming.py
 
 Helper functions to convert between different naming conventions:
-- snake_case
-- PascalCase
-- kebab-case
+  - snake_case
+  - PascalCase
+  - kebab-case
 
 Also includes a validator to check that an entity or field name
 matches a basic regex (starts with a letter, only letters/digits/underscores).

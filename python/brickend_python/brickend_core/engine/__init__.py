@@ -1,4 +1,6 @@
 """
+__init__.py
+
 Engine module for Brickend Core.
 
 This module contains the core code generation engine components.
@@ -11,10 +13,10 @@ from .code_generator import CodeGenerator
 from .protected_regions import ProtectedRegionsHandler, SmartProtectedRegionsHandler
 
 __all__ = [
-    'ContextBuilder',
-    'TemplateEngine',
-    'TemplateRegistry',
-    'CodeGenerator',
-    'ProtectedRegionsHandler',
-    'SmartProtectedRegionsHandler'
+    "ContextBuilder",
+    "TemplateEngine",
+    "TemplateRegistry",
+    "CodeGenerator",
+    "ProtectedRegionsHandler",
+    "SmartProtectedRegionsHandler",
 ]
