@@ -85,7 +85,7 @@ def ensure_clean_fastapi_templates(tmp_path, monkeypatch):
         monkeypatch: Fixture to modify environment (cwd).
     """
     real_project_root = Path(__file__).parents[2]
-    fastapi_dir = real_project_root / "brickend_core" / "integrations" / "back" / "fastapi"
+    fastapi_dir = real_project_root / "src" / "brickend_core" / "integrations" / "back" / "fastapi"
     assert fastapi_dir.is_dir(), "FastAPI integration directory is missing in the repository."
 
     monkeypatch.chdir(real_project_root)

@@ -16,10 +16,10 @@ Covers:
 from pathlib import Path
 
 from brickend_core.engine.context_builder import ContextBuilder
-from brickend_core.engine.template_registry import TemplateRegistry
+from brickend_core.engine import TemplateRegistry
 from brickend_core.engine.template_engine import TemplateEngine
 from brickend_core.engine.code_generator import CodeGenerator
-from brickend_core.engine.protected_regions import SmartProtectedRegionsHandler
+from brickend_core.engine import SmartProtectedRegionsHandler
 
 
 def test_protected_regions(tmp_path):
@@ -51,6 +51,7 @@ def test_protected_regions(tmp_path):
     template_dir = (
         Path(__file__)
         .parents[2]
+        / "src"
         / "brickend_core"
         / "integrations"
         / "back"
@@ -207,6 +208,7 @@ def test_project_structure_generation(tmp_path):
     template_dir = (
         Path(__file__)
         .parents[2]
+        / "src"
         / "brickend_core"
         / "integrations"
         / "back"
@@ -257,6 +259,7 @@ def test_disable_protected_regions(tmp_path):
     template_dir = (
         Path(__file__)
         .parents[2]
+        / "src"
         / "brickend_core"
         / "integrations"
         / "back"
@@ -310,6 +313,7 @@ def test_multiple_protected_regions(tmp_path):
     template_dir = (
         Path(__file__)
         .parents[2]
+        / "src"
         / "brickend_core"
         / "integrations"
         / "back"

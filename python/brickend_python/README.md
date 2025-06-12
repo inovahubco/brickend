@@ -24,23 +24,23 @@ pip install -e .[dev]
 1. **Initialize a project**
 
    ```bash
-   brickend init my_project
+   brickend init project my_project
    cd my_project
    ```
 2. **Add an entity**
 
    ```bash
-   brickend add_entity User --fields id:uuid:pk:unique, email:string:unique, full_name:string
+   brickend add_entity entity
    ```
 3. **Generate code**
 
    ```bash
-   brickend generate
+   brickend generate code entities.yaml -o .
    ```
 4. **Run migrations**
 
    ```bash
-   brickend migrate
+   brickend migrate db
    ```
 5. **Start the server**
 
@@ -51,10 +51,10 @@ pip install -e .[dev]
 
 ## 🛠 CLI Commands
 
-* `brickend init <name>`: Create the base project structure.
-* `brickend add_entity <EntityName>`: Add or update `entities.yaml`.
-* `brickend generate`: Generate models, schemas, CRUD operations, routers, and configuration.
-* `brickend migrate`: Apply Alembic migrations (create, upgrade, downgrade).
+* `brickend init project <name>`: Create the base project structure.
+* `brickend add_entity entity`: Add or update `entities.yaml`.
+* `brickend generate code`: Generate models, schemas, CRUD operations, routers, and configuration.
+* `brickend migrate db`: Apply Alembic migrations (create, upgrade, downgrade).
 
 ## 📂 Generated Folder Structure
 
