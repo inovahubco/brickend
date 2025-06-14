@@ -1,21 +1,43 @@
 {#
 db_template.j2
 
-Generates `app/database.py` with SQLAlchemy engine, SessionLocal, and FastAPI dependency.
+Purpose:
+  Generate the database configuration module at `app/database.py` for a FastAPI project.
 
-This template:
-  - Determines `SQLALCHEMY_DATABASE_URL` from provided `database_url` or defaults to a file-based SQLite URL.
-  - Uses `StaticPool` and disables thread checks for SQLite connections.
-  - Defines `engine`, `SessionLocal`, and the `get_db` dependency generator.
+Context:
+  - `database_url`: optional URL passed via CLI; if empty or blank, defaults to an on-disk SQLite file.
+  - Template logic chooses between in-memory vs file-based SQLite for testing.
+
+Renders:
+  - `SQLALCHEMY_DATABASE_URL` constant
+  - `engine` (SQLAlchemy Engine with StaticPool for SQLite)
+  - `SessionLocal` (session factory)
+  - `get_db` FastAPI dependency generator
+
+Notes:
+  - `connect_args={"check_same_thread": False}` and `poolclass=StaticPool` ensure single-connection behavior for SQLite.
 #}
 """
 app/database.py
+
+Database configuration for the FastAPI application.
+
+This module defines:
+  - SQLALCHEMY_DATABASE_URL: the database connection URL (SQLite by default).
+  - engine: SQLAlchemy Engine instance with appropriate pool settings.
+  - SessionLocal: sessionmaker factory for database sessions.
+  - get_db: FastAPI dependency that yields a session and ensures it is closed.
+
+Usage:
+    from app.database import get_db
+    db: Session = Depends(get_db)
 """
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 {% set db_url = database_url if database_url and database_url.strip() else "sqlite:///:memory:" %}
 from sqlalchemy.pool import StaticPool
+
 
 # If no URL provided, use a file-based SQLite for testing to avoid in-memory concurrency issues
 {% if db_url == "sqlite:///:memory:" -%}
@@ -37,12 +59,16 @@ SessionLocal = sessionmaker(
     bind=engine,
 )
 
+
 def get_db():
     """
-    FastAPI dependency generator: yield a database session and ensure closure.
+    FastAPI dependency generator for obtaining a database session.
+
+    This function yields a SQLAlchemy Session instance and guarantees
+    that the session is closed after the request is completed.
 
     Yields:
-        Session: SQLAlchemy database session.
+        Session: An active SQLAlchemy session for database operations.
     """
     db = SessionLocal()
     try:

@@ -1,14 +1,30 @@
 {#
 schemas_template.j2
 
-Generates Pydantic v2 models (schemas) for FastAPI validation.
-Each entity yields three classes:
-  - {{ entity.names.pascal }}Base: fields excluding primary key.
-  - {{ entity.names.pascal }}Create: same as Base, used for creation.
-  - {{ entity.names.pascal }}Read: includes primary key, used for responses (ORM mode).
+Purpose:
+  Generate Pydantic v2 schema models in `app/schemas.py` for each entity.
+
+Context:
+  - `entities`: list of entity contexts with:
+      • `names.pascal`
+      • `fields[*].names.snake`, `fields[*].type`, `fields[*].is_primary_key`, `fields[*].is_nullable`
+
+Renders, for each entity:
+  1. `<EntityName>Base`   – base schema excluding the primary key
+  2. `<EntityName>Create` – used for creation (inherits Base)
+  3. `<EntityName>Read`   – includes primary key and enables ORM mode via `model_config`
 #}
 """
 app/schemas.py
+
+Pydantic v2 schema definitions for FastAPI.
+
+This module defines three classes per entity:
+  - <EntityName>Base   : Shared fields (excludes primary key)
+  - <EntityName>Create : Inherits Base, for request payloads
+  - <EntityName>Read   : Inherits Base, adds primary key and enables ORM mode
+
+These schemas are used for request validation and response serialization.
 """
 
 from pydantic import BaseModel, ConfigDict
@@ -39,8 +55,5 @@ class {{ entity.names.pascal }}Read({{ entity.names.pascal }}Base):
 {%- endif %}
 {%- endfor %}
 
-    # Pydantic v2 ORM mode
     model_config = ConfigDict(from_attributes=True)
-
-
 {% endfor %}

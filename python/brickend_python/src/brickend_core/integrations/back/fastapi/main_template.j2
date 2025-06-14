@@ -1,19 +1,35 @@
 {#
 main_template.j2
 
-Generates `app/main.py` mounting all routers from `app/routers`.
+Purpose:
+  Generate the FastAPI application entrypoint at `app/main.py`, mounting all routers
+  and ensuring database tables are created.
 
-This template:
-  - Imports FastAPI, SQLAlchemy engine, and Base model metadata.
-  - Defines `create_tables` to initialize database tables with logging and validation.
-  - Implements an async lifespan manager to run on startup/shutdown.
-  - Configures the FastAPI app with title and version from context.
-  - Ensures tables exist even outside the lifespan (e.g., during tests).
-  - Includes routers for each entity under `/{{ entity.names.kebab }}s` with proper tags.
-  - Provides a root endpoint (`GET /`) returning a welcome message.
+Context:
+  - `project_name`, `project_version`: used to configure FastAPI metadata.
+  - `entities`: list of entity contexts to import and include routers for.
+
+Renders:
+  1. Imports for FastAPI, SQLAlchemy engine and Base metadata.
+  2. `create_tables()` function to initialize DB tables with logging and verification.
+  3. Async `lifespan` context manager for startup/shutdown hooks.
+  4. FastAPI `app` instance configured with title, version, and lifespan.
+  5. Table-existence check outside lifespan (for tests/imports).
+  6. `app.include_router(...)` calls for each entity under `/{{ entity.names.kebab }}s`.
+  7. A root GET endpoint (`read_root`) returning a welcome message.
 #}
 """
 app/main.py
+
+FastAPI application entrypoint and router mounting.
+
+This module defines:
+  - create_tables: Initialize and verify all database tables.
+  - lifespan: Async context manager for startup (create tables) and shutdown logging.
+  - app: FastAPI instance configured with metadata and lifespan.
+  - Table-existence guard to ensure tables exist even outside lifespan (useful in tests).
+  - Inclusion of each entity’s router under `/entities` endpoints.
+  - read_root: A simple root endpoint returning a welcome message.
 """
 
 from contextlib import asynccontextmanager
@@ -27,7 +43,16 @@ from app.routers.{{ entity.names.snake }}_router import router as {{ entity.name
 
 def create_tables():
     """
-    Create all tables in the database; log progress and verify existence.
+    Initialize all database tables based on SQLAlchemy metadata.
+
+    This function:
+      - Logs the engine and the tables to be created.
+      - Calls Base.metadata.create_all(bind=engine, checkfirst=True).
+      - Inspects the database to verify that all expected tables exist.
+      - Logs any missing tables or errors encountered during creation.
+
+    Raises:
+        Exception: Propagates any error during table creation after logging.
     """
     print("🔄 Creating database tables...")
     print(f"🔧 Engine: {engine}")
@@ -53,14 +78,35 @@ def create_tables():
         import traceback; traceback.print_exc()
         raise
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
-    Lifespan manager: creates tables on startup, logs shutdown.
+    FastAPI lifespan manager for application startup and shutdown.
+
+    On startup:
+      - Calls create_tables() to ensure all tables are created.
+    On shutdown:
+      - Logs a shutdown message.
+
+    Yields:
+        None
     """
     create_tables()
     yield
     print("🔚 Application shutdown")
+
+
+@app.get("/", tags=["root"])
+def read_root():
+    """
+    Root endpoint returning a simple welcome message.
+
+    Returns:
+        dict: A JSON object with a "message" key welcoming the user to the application.
+    """
+    return {"message": "Welcome to {{ project_name | default('your app') }}!"}
+
 
 app = FastAPI(
     title="{{ project_name | default('FastAPI App') }}",
@@ -88,8 +134,3 @@ app.include_router(
     tags=["{{ entity.names.pascal }}"]
 )
 {% endfor %}
-
-@app.get("/", tags=["root"])
-def read_root():
-    """Root endpoint returning a welcome message."""
-    return {"message": "Welcome to {{ project_name | default('your app') }}!"}
