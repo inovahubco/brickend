@@ -1,4 +1,4 @@
-# Brickend Alpha – Python
+# Brickend Python - Alpha Version
 
 **Brickend** is a code generation framework for Python back-end projects, designed to accelerate API development with FastAPI, SQLAlchemy/Alembic, and Jinja2 templates.
 

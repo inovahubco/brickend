@@ -1,4 +1,5 @@
-{# main_template.j2
+{#
+main_template.j2
 
 Generates `app/main.py` mounting all routers from `app/routers`.
 
@@ -11,6 +12,9 @@ This template:
   - Includes routers for each entity under `/{{ entity.names.kebab }}s` with proper tags.
   - Provides a root endpoint (`GET /`) returning a welcome message.
 #}
+"""
+app/main.py
+"""
 
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
