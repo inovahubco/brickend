@@ -10,7 +10,7 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader, TemplateSyntaxError
 
 
-TEMPLATES_DIR = Path("brickend_core/integrations/back/fastapi")
+TEMPLATES_DIR = Path("src/brickend_core/integrations/back/fastapi")
 
 
 @pytest.mark.parametrize("tpl_path", list(TEMPLATES_DIR.rglob("*.j2")))

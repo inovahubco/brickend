@@ -85,7 +85,7 @@ def test_context_builder():
         dict or None: Generated context if successful, otherwise None.
     """
     try:
-        from brickend_core.templates.context_builder import ContextBuilder
+        from src.brickend_core import ContextBuilder
 
         entities_dict = {
             "entities": [

@@ -13,7 +13,7 @@ Covers:
 
 import pytest
 
-from brickend_core.engine.template_registry import TemplateRegistry
+from brickend_core.engine import TemplateRegistry
 
 
 @pytest.fixture

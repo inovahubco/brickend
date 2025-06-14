@@ -1,0 +1,178 @@
+{#
+router_template.j2
+
+Purpose:
+  Generate the FastAPI router module for a single entity in `app/routers/{{ entity.names.snake }}_router.py`.
+
+Context:
+  - `entity`: dict with `names.snake`, `names.pascal`, and `names.kebab`, plus `fields`.
+  - `first_field.type`: used to import the correct Python type (UUID, datetime, etc.)
+
+Renders five endpoint functions:
+  - `read_{{ entity.names.snake }}_list_endpoint`
+  - `read_{{ entity.names.snake }}_endpoint`
+  - `create_{{ entity.names.snake }}_endpoint`
+  - `update_{{ entity.names.snake }}_endpoint`
+  - `delete_{{ entity.names.snake }}_endpoint`
+
+Each uses:
+  - CRUD functions from `app.crud.{{ entity.names.snake }}_crud`
+  - Pydantic schemas from `app.schemas`
+  - Database dependency via `app.database.get_db`
+#}
+"""
+app/routers/{{ entity.names.snake }}_router.py
+
+Router for the {{ entity.names.pascal }} entity.
+
+This module defines FastAPI endpoints to perform CRUD operations on
+{{ entity.names.pascal }} resources, using the corresponding
+CRUD functions and Pydantic schemas.
+
+Endpoints:
+  - GET    /            → list all with pagination
+  - GET    /{id}        → retrieve one by primary key
+  - POST   /            → create a new record
+  - PUT    /{id}        → update an existing record
+  - DELETE /{id}        → delete a record
+"""
+
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+
+from app.crud.{{ entity.names.snake }}_crud import (
+    get_{{ entity.names.snake }},
+    get_{{ entity.names.snake }}_list,
+    create_{{ entity.names.snake }},
+    update_{{ entity.names.snake }},
+    delete_{{ entity.names.snake }},
+)
+from app.schemas import (
+    {{ entity.names.pascal }}Create,
+    {{ entity.names.pascal }}Read,
+)
+from app.database import get_db
+{% set first_field = entity.fields[0] %}
+{% if first_field.type == 'uuid' %}from uuid import UUID
+{% elif first_field.type == 'datetime' %}from datetime import datetime
+{% endif %}
+
+
+router = APIRouter(
+    tags=["{{ entity.names.pascal }}"]
+)
+
+
+@router.get("/", response_model=list[{{ entity.names.pascal }}Read])
+def read_{{ entity.names.snake }}_list_endpoint(
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+):
+    """
+    Retrieve a paginated list of {{ entity.names.pascal }} records.
+
+    Args:
+        skip (int): Number of records to skip.
+        limit (int): Maximum number of records to return.
+        db (Session): Database session dependency.
+
+    Returns:
+        List[{{ entity.names.pascal }}Read]: List of serialized records.
+    """
+    results = get_{{ entity.names.snake }}_list(db, skip=skip, limit=limit)
+    # Convert each SQLAlchemy object to Pydantic schema
+    return [ {{ entity.names.pascal }}Read.model_validate(obj) for obj in results ]
+
+
+@router.get("/{id}", response_model={{ entity.names.pascal }}Read)
+def read_{{ entity.names.snake }}_endpoint(
+    id: {% if first_field.type == 'uuid' %}UUID{% elif first_field.type == 'string' or first_field.type == 'text' %}str{% elif first_field.type == 'integer' %}int{% elif first_field.type == 'float' %}float{% elif first_field.type == 'boolean' %}bool{% elif first_field.type == 'datetime' %}datetime{% else %}str{% endif %},
+    db: Session = Depends(get_db),
+):
+    """
+    Retrieve a single {{ entity.names.pascal }} by its primary key.
+
+    Args:
+        id (UUID|str|int|bool|datetime): Primary key of the record.
+        db (Session): Database session dependency.
+
+    Raises:
+        HTTPException(status_code=404): If the record is not found.
+
+    Returns:
+        {{ entity.names.pascal }}Read: The serialized record.
+    """
+    obj = get_{{ entity.names.snake }}(db, id)
+    if not obj:
+        raise HTTPException(status_code=404, detail="{{ entity.names.pascal }} not found")
+    return {{ entity.names.pascal }}Read.model_validate(obj)
+
+
+@router.post("/", response_model={{ entity.names.pascal }}Read)
+def create_{{ entity.names.snake }}_endpoint(
+    obj_in: {{ entity.names.pascal }}Create,
+    db: Session = Depends(get_db),
+):
+    """
+    Create a new {{ entity.names.pascal }} record.
+
+    Args:
+        obj_in ({{ entity.names.pascal }}Create): Input schema with record data.
+        db (Session): Database session dependency.
+
+    Returns:
+        {{ entity.names.pascal }}Read: The created record.
+    """
+    db_obj = create_{{ entity.names.snake }}(db, obj_in)
+    return {{ entity.names.pascal }}Read.model_validate(db_obj)
+
+
+@router.put("/{id}", response_model={{ entity.names.pascal }}Read)
+def update_{{ entity.names.snake }}_endpoint(
+    id: {% if first_field.type == 'uuid' %}UUID{% elif first_field.type == 'string' or first_field.type == 'text' %}str{% elif first_field.type == 'integer' %}int{% elif first_field.type == 'float' %}float{% elif first_field.type == 'boolean' %}bool{% elif first_field.type == 'datetime' %}datetime{% else %}str{% endif %},
+    obj_in: {{ entity.names.pascal }}Create,
+    db: Session = Depends(get_db),
+):
+    """
+    Update an existing {{ entity.names.pascal }} record by primary key.
+
+    Args:
+        id (UUID|str|int|bool|datetime): Primary key of the record.
+        obj_in ({{ entity.names.pascal }}Create): Input schema with updated data.
+        db (Session): Database session dependency.
+
+    Raises:
+        HTTPException(status_code=404): If the record is not found.
+
+    Returns:
+        {{ entity.names.pascal }}Read: The updated record.
+    """
+    updated = update_{{ entity.names.snake }}(db, id, obj_in)
+    if not updated:
+        raise HTTPException(status_code=404, detail="{{ entity.names.pascal }} not found")
+    return {{ entity.names.pascal }}Read.model_validate(updated)
+
+
+@router.delete("/{id}", response_model={{ entity.names.pascal }}Read)
+def delete_{{ entity.names.snake }}_endpoint(
+    id: {% if first_field.type == 'uuid' %}UUID{% elif first_field.type == 'string' or first_field.type == 'text' %}str{% elif first_field.type == 'integer' %}int{% elif first_field.type == 'float' %}float{% elif first_field.type == 'boolean' %}bool{% elif first_field.type == 'datetime' %}datetime{% else %}str{% endif %},
+    db: Session = Depends(get_db),
+):
+    """
+    Delete a {{ entity.names.pascal }} record by primary key.
+
+    Args:
+        id (UUID|str|int|bool|datetime): Primary key of the record.
+        db (Session): Database session dependency.
+
+    Raises:
+        HTTPException(status_code=404): If the record is not found.
+
+    Returns:
+        {{ entity.names.pascal }}Read: The deleted record.
+    """
+    deleted = delete_{{ entity.names.snake }}(db, id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="{{ entity.names.pascal }} not found")
+    return {{ entity.names.pascal }}Read.model_validate(deleted)

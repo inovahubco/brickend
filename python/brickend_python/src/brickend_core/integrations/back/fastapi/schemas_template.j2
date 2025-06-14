@@ -1,0 +1,59 @@
+{#
+schemas_template.j2
+
+Purpose:
+  Generate Pydantic v2 schema models in `app/schemas.py` for each entity.
+
+Context:
+  - `entities`: list of entity contexts with:
+      • `names.pascal`
+      • `fields[*].names.snake`, `fields[*].type`, `fields[*].is_primary_key`, `fields[*].is_nullable`
+
+Renders, for each entity:
+  1. `<EntityName>Base`   – base schema excluding the primary key
+  2. `<EntityName>Create` – used for creation (inherits Base)
+  3. `<EntityName>Read`   – includes primary key and enables ORM mode via `model_config`
+#}
+"""
+app/schemas.py
+
+Pydantic v2 schema definitions for FastAPI.
+
+This module defines three classes per entity:
+  - <EntityName>Base   : Shared fields (excludes primary key)
+  - <EntityName>Create : Inherits Base, for request payloads
+  - <EntityName>Read   : Inherits Base, adds primary key and enables ORM mode
+
+These schemas are used for request validation and response serialization.
+"""
+
+from pydantic import BaseModel, ConfigDict
+from typing import Optional
+from uuid import UUID
+from datetime import datetime
+
+{% for entity in entities %}
+class {{ entity.names.pascal }}Base(BaseModel):
+    """Base schema for {{ entity.names.pascal }} (excludes primary key)."""
+{%- for field in entity.fields %}
+{%- if not field.is_primary_key %}
+    {{ field.names.snake }}: {% if field.type == 'uuid' %}UUID{% elif field.type == 'string' or field.type == 'text' %}str{% elif field.type == 'integer' %}int{% elif field.type == 'float' %}float{% elif field.type == 'boolean' %}bool{% elif field.type == 'datetime' %}datetime{% else %}str{% endif %}{% if field.is_nullable %} | None = None{% endif %}  # {{ field.type }}{% if field.is_nullable %}, optional{% endif %}
+{%- endif %}
+{%- endfor %}
+
+
+class {{ entity.names.pascal }}Create({{ entity.names.pascal }}Base):
+    """Schema for creating a new {{ entity.names.pascal }}."""
+    pass
+
+
+class {{ entity.names.pascal }}Read({{ entity.names.pascal }}Base):
+    """Schema for reading {{ entity.names.pascal }}, includes primary key."""
+{%- for field in entity.fields %}
+{%- if field.is_primary_key %}
+    {{ field.names.snake }}: {% if field.type == 'uuid' %}UUID{% elif field.type == 'string' or field.type == 'text' %}str{% elif field.type == 'integer' %}int{% elif field.type == 'float' %}float{% elif field.type == 'boolean' %}bool{% elif field.type == 'datetime' %}datetime{% else %}str{% endif %}  # primary key
+{%- endif %}
+{%- endfor %}
+
+    model_config = ConfigDict(from_attributes=True)
+{% endfor %}

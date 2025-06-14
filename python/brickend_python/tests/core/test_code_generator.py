@@ -14,7 +14,7 @@ import pytest
 from pathlib import Path
 
 from brickend_core.engine.context_builder import ContextBuilder
-from brickend_core.engine.template_registry import TemplateRegistry
+from brickend_core.engine import TemplateRegistry
 from brickend_core.engine.template_engine import TemplateEngine
 from brickend_core.engine.code_generator import CodeGenerator
 
@@ -152,7 +152,7 @@ def test_generate_project_success(tmp_path):
     context = builder.build_context(entities_dict)
     context["database_url"] = "sqlite:///./test.db"
 
-    fastapi_templates_dir = Path("brickend_core/integrations/back/fastapi")
+    fastapi_templates_dir = Path("src/brickend_core/integrations/back/fastapi")
     assert fastapi_templates_dir.is_dir(), "FastAPI templates directory must exist for this test"
 
     registry = TemplateRegistry([fastapi_templates_dir])
@@ -222,7 +222,7 @@ def test_generate_project_multiple_entities(tmp_path):
     context = builder.build_context(entities_dict)
     context["database_url"] = "sqlite:///./test.db"
 
-    fastapi_templates_dir = Path("brickend_core/integrations/back/fastapi")
+    fastapi_templates_dir = Path("src/brickend_core/integrations/back/fastapi")
     registry = TemplateRegistry([fastapi_templates_dir])
     engine = TemplateEngine([fastapi_templates_dir], auto_reload=False)
 
@@ -268,7 +268,7 @@ def test_generate_project_invalid_integration(tmp_path):
     context = builder.build_context(entities_dict)
     context["database_url"] = "sqlite:///./test.db"
 
-    fastapi_templates_dir = Path("brickend_core/integrations/back/fastapi")
+    fastapi_templates_dir = Path("src/brickend_core/integrations/back/fastapi")
     registry = TemplateRegistry([fastapi_templates_dir])
     engine = TemplateEngine([fastapi_templates_dir], auto_reload=False)
 
@@ -301,7 +301,7 @@ def test_generate_project_missing_template(tmp_path):
 
     temp_templates_dir = tmp_path / "templates_fastapi"
     temp_templates_dir.mkdir()
-    original = Path("brickend_core/integrations/back/fastapi")
+    original = Path("src/brickend_core/integrations/back/fastapi")
     for tpl in original.rglob("*.j2"):
         dest = temp_templates_dir / tpl.name
         dest.write_text(tpl.read_text(encoding="utf-8"), encoding="utf-8")
@@ -339,7 +339,7 @@ def test_generate_project_protected_regions_disabled(tmp_path):
     context = builder.build_context(entities_dict)
     context["database_url"] = "sqlite:///./test.db"
 
-    fastapi_templates_dir = Path("brickend_core/integrations/back/fastapi")
+    fastapi_templates_dir = Path("src/brickend_core/integrations/back/fastapi")
     registry = TemplateRegistry([fastapi_templates_dir])
     engine = TemplateEngine([fastapi_templates_dir], auto_reload=False)
 
@@ -375,7 +375,7 @@ def test_generate_project_file_structure(tmp_path):
     context = builder.build_context(entities_dict)
     context["database_url"] = "sqlite:///./test.db"
 
-    fastapi_templates_dir = Path("brickend_core/integrations/back/fastapi")
+    fastapi_templates_dir = Path("src/brickend_core/integrations/back/fastapi")
     registry = TemplateRegistry([fastapi_templates_dir])
     engine = TemplateEngine([fastapi_templates_dir], auto_reload=False)
 

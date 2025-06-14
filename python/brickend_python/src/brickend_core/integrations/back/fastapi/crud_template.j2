@@ -1,0 +1,158 @@
+{#
+crud_template.j2
+
+Purpose:
+  Generate the CRUD module for a single entity in `app/crud/{{ entity.names.snake }}_crud.py`.
+
+Context:
+  - `entity`: dict with keys
+      • `names.snake`, `names.pascal`, `names.kebab`
+      • `fields`: list of field definitions
+  - `first_field.type`: used to import the correct Python type (UUID, datetime, etc.)
+
+Renders:
+  - `get_{{ entity.names.snake }}`: fetch one record by primary key
+  - `get_{{ entity.names.snake }}_list`: fetch a page of records
+  - `create_{{ entity.names.snake }}`: insert a new record
+  - `update_{{ entity.names.snake }}`: modify an existing record
+  - `delete_{{ entity.names.snake }}`: remove a record
+
+Protected regions (`CRUD_METHODS`) may be inserted between:
+    # BRICKEND:PROTECTED-START CRUD_METHODS
+    # BRICKEND:PROTECTED-END CRUD_METHODS
+#}
+"""
+app/crud/{{ entity.names.snake }}_crud.py
+
+CRUD operations for the {{ entity.names.pascal }} entity.
+
+This module provides functions to Create, Read, Update, and Delete
+{{ entity.names.pascal }} records using a SQLAlchemy Session.
+
+Functions:
+  - get_{{ entity.names.snake }}
+  - get_{{ entity.names.snake }}_list
+  - create_{{ entity.names.snake }}
+  - update_{{ entity.names.snake }}
+  - delete_{{ entity.names.snake }}
+"""
+
+from sqlalchemy.orm import Session
+from app.models import {{ entity.names.pascal }}
+from app.schemas import {{ entity.names.pascal }}Create
+{% set first_field = entity.fields[0] %}
+{% if first_field.type == 'uuid' %}from uuid import UUID
+{% elif first_field.type == 'datetime' %}from datetime import datetime
+{% endif %}
+
+
+def get_{{ entity.names.snake }}(
+    db: Session,
+    id: {% if first_field.type == 'uuid' %}UUID{% elif first_field.type == 'string' %}str{% elif first_field.type == 'text' %}str{% elif first_field.type == 'integer' %}int{% elif first_field.type == 'float' %}float{% elif first_field.type == 'boolean' %}bool{% elif first_field.type == 'datetime' %}datetime{% else %}str{% endif %}
+):
+    """
+    Retrieve a single {{ entity.names.pascal }} by its primary key.
+
+    Args:
+        db (Session): SQLAlchemy session.
+        id (UUID|str|int|bool|datetime): Primary key value.
+
+    Returns:
+        {{ entity.names.pascal }} | None: The matching record, or None if not found.
+    """
+    # Convert UUID to string for database comparison
+    {% if first_field.type == 'uuid' -%}
+    search_id = str(id)
+    {%- else -%}
+    search_id = id
+    {%- endif %}
+    return db.query({{ entity.names.pascal }}).filter(
+        {{ entity.names.pascal }}.{{ first_field.names.snake }} == search_id
+    ).first()
+
+
+def get_{{ entity.names.snake }}_list(db: Session, skip: int = 0, limit: int = 100):
+    """
+    Retrieve a paginated list of {{ entity.names.pascal }} records.
+
+    Args:
+        db (Session): SQLAlchemy session.
+        skip (int): Number of records to skip.
+        limit (int): Maximum number of records to return.
+
+    Returns:
+        List[{{ entity.names.pascal }}]: List of records.
+    """
+    return db.query({{ entity.names.pascal }}).offset(skip).limit(limit).all()
+
+
+def create_{{ entity.names.snake }}(db: Session, obj_in: {{ entity.names.pascal }}Create):
+    """
+    Create and return a new {{ entity.names.pascal }} record.
+
+    Args:
+        db (Session): SQLAlchemy session.
+        obj_in ({{ entity.names.pascal }}Create): Input schema with record data.
+
+    Returns:
+        {{ entity.names.pascal }}: The newly created record.
+    """
+    {%- if True %}
+    data = obj_in.model_dump() if hasattr(obj_in, "model_dump") else obj_in.dict()
+    db_obj = {{ entity.names.pascal }}(**data)
+    {%- else %}
+    db_obj = {{ entity.names.pascal }}(**obj_in.dict())
+    {%- endif %}
+    db.add(db_obj)
+    db.commit()
+    db.refresh(db_obj)
+    return db_obj
+
+
+def update_{{ entity.names.snake }}(
+    db: Session,
+    id: {% if first_field.type == 'uuid' %}UUID{% elif first_field.type in ['string','text'] %}str{% elif first_field.type == 'integer' %}int{% elif first_field.type == 'float' %}float{% elif first_field.type == 'boolean' %}bool{% elif first_field.type == 'datetime' %}datetime{% else %}str{% endif %},
+    obj_in: {{ entity.names.pascal }}Create
+):
+    """
+    Update an existing {{ entity.names.pascal }} record by its primary key.
+
+    Args:
+        db (Session): SQLAlchemy session.
+        id (UUID|str|int|bool|datetime): Primary key of the record.
+        obj_in ({{ entity.names.pascal }}Create): Input schema with updated data.
+
+    Returns:
+        {{ entity.names.pascal }} | None: The updated record, or None if not found.
+    """
+    db_obj = get_{{ entity.names.snake }}(db, id)
+    if not db_obj:
+        return None
+    data = obj_in.model_dump() if hasattr(obj_in, "model_dump") else obj_in.dict()
+    for field, value in data.items():
+        setattr(db_obj, field, value)
+    db.add(db_obj)
+    db.commit()
+    db.refresh(db_obj)
+    return db_obj
+
+
+def delete_{{ entity.names.snake }}(
+    db: Session,
+    id: {% if first_field.type == 'uuid' %}UUID{% elif first_field.type == 'string' %}str{% elif first_field.type == 'text' %}str{% elif first_field.type == 'integer' %}int{% elif first_field.type == 'float' %}float{% elif first_field.type == 'boolean' %}bool{% elif first_field.type == 'datetime' %}datetime{% else %}str{% endif %}
+):
+    """
+    Delete a {{ entity.names.pascal }} record by its primary key.
+
+    Args:
+        db (Session): SQLAlchemy session.
+        id (UUID|str|int|bool|datetime): Primary key of the record.
+
+    Returns:
+        {{ entity.names.pascal }} | None: The deleted record, or None if not found.
+    """
+    obj = get_{{ entity.names.snake }}(db, id)
+    if obj:
+        db.delete(obj)
+        db.commit()
+    return obj

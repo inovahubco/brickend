@@ -1,0 +1,77 @@
+{#
+db_template.j2
+
+Purpose:
+  Generate the database configuration module at `app/database.py` for a FastAPI project.
+
+Context:
+  - `database_url`: optional URL passed via CLI; if empty or blank, defaults to an on-disk SQLite file.
+  - Template logic chooses between in-memory vs file-based SQLite for testing.
+
+Renders:
+  - `SQLALCHEMY_DATABASE_URL` constant
+  - `engine` (SQLAlchemy Engine with StaticPool for SQLite)
+  - `SessionLocal` (session factory)
+  - `get_db` FastAPI dependency generator
+
+Notes:
+  - `connect_args={"check_same_thread": False}` and `poolclass=StaticPool` ensure single-connection behavior for SQLite.
+#}
+"""
+app/database.py
+
+Database configuration for the FastAPI application.
+
+This module defines:
+  - SQLALCHEMY_DATABASE_URL: the database connection URL (SQLite by default).
+  - engine: SQLAlchemy Engine instance with appropriate pool settings.
+  - SessionLocal: sessionmaker factory for database sessions.
+  - get_db: FastAPI dependency that yields a session and ensures it is closed.
+
+Usage:
+    from app.database import get_db
+    db: Session = Depends(get_db)
+"""
+
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+{% set db_url = database_url if database_url and database_url.strip() else "sqlite:///:memory:" %}
+from sqlalchemy.pool import StaticPool
+
+
+# If no URL provided, use a file-based SQLite for testing to avoid in-memory concurrency issues
+{% if db_url == "sqlite:///:memory:" -%}
+SQLALCHEMY_DATABASE_URL = "sqlite:///./test_app.db"
+{% else -%}
+SQLALCHEMY_DATABASE_URL = "{{ db_url }}"
+{% endif -%}
+
+engine = create_engine(
+    SQLALCHEMY_DATABASE_URL,
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool,
+    echo=False,  # Set to True for SQL debugging
+)
+
+SessionLocal = sessionmaker(
+    autocommit=False,
+    autoflush=False,
+    bind=engine,
+)
+
+
+def get_db():
+    """
+    FastAPI dependency generator for obtaining a database session.
+
+    This function yields a SQLAlchemy Session instance and guarantees
+    that the session is closed after the request is completed.
+
+    Yields:
+        Session: An active SQLAlchemy session for database operations.
+    """
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()

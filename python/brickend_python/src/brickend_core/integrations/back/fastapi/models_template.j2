@@ -1,0 +1,80 @@
+{#
+models_template.j2
+
+Purpose:
+  Generate SQLAlchemy ORM model classes for each entity in the project.
+
+Context:
+  - Expects `entities` in the template context, each with:
+      - `names.pascal` for the class name
+      - `names.snake` for the table name (pluralized)
+      - A list of `fields` with attributes controlling Column definitions
+
+Renders:
+  1. `generate_uuid()` helper function for UUID primary keys.
+  2. `Base = declarative_base()`.
+  3. One model class per entity, each with `__tablename__` and Column definitions
+     (including type, primary_key, nullable, unique).
+#}
+"""
+app/models.py
+
+SQLAlchemy ORM models for the application.
+
+This module defines:
+  - generate_uuid(): Helper function to produce UUID4 strings for primary keys.
+  - Base: Declarative base for all model classes.
+  - One SQLAlchemy model class per entity, each mapping to a table named
+    "<entity_snake_name>s" with appropriate Column definitions.
+
+Example:
+    from app.models import Base, User, Post
+"""
+
+from sqlalchemy import Column, String, Integer, Float, Boolean, Text
+from sqlalchemy.orm import declarative_base
+import uuid
+
+
+def generate_uuid():
+    """
+    Generate a UUID4 string for use as a default primary key value.
+
+    Returns:
+        str: A newly generated UUID4 represented as a hexadecimal string.
+    """
+    return str(uuid.uuid4())
+
+
+Base = declarative_base()
+
+{% for entity in entities %}
+class {{ entity.names.pascal }}(Base):
+    """
+    SQLAlchemy model for the {{ entity.names.pascal }} entity.
+    """
+    __tablename__ = "{{ entity.names.snake }}s"
+
+    {% for field in entity.fields -%}
+    {{ field.names.snake }} = Column(
+        {% if field.type == 'uuid' -%}
+        String, default=generate_uuid
+        {%- elif field.type == 'string' -%}
+        String
+        {%- elif field.type == 'text' -%}
+        Text
+        {%- elif field.type == 'integer' -%}
+        Integer
+        {%- elif field.type == 'float' -%}
+        Float
+        {%- elif field.type == 'boolean' -%}
+        Boolean
+        {%- else -%}
+        String
+        {%- endif %}
+        {%- if field.is_primary_key %}, primary_key=True{% endif %}
+        {%- if not field.is_nullable %}, nullable=False{% endif %}
+        {%- if field.is_unique %}, unique=True{% endif %}
+    )
+    {% endfor %}
+{% endfor %}
