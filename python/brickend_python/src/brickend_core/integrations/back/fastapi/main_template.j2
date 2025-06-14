@@ -97,6 +97,13 @@ async def lifespan(app: FastAPI):
     print("🔚 Application shutdown")
 
 
+app = FastAPI(
+    title="{{ project_name | default('FastAPI App') }}",
+    version="{{ project_version | default('0.1.0') }}",
+    lifespan=lifespan
+)
+
+
 @app.get("/", tags=["root"])
 def read_root():
     """
@@ -107,12 +114,6 @@ def read_root():
     """
     return {"message": "Welcome to {{ project_name | default('your app') }}!"}
 
-
-app = FastAPI(
-    title="{{ project_name | default('FastAPI App') }}",
-    version="{{ project_version | default('0.1.0') }}",
-    lifespan=lifespan
-)
 
 # Ensure tables exist outside lifespan (e.g., during imports/tests)
 try:
