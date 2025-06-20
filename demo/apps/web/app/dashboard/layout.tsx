@@ -1,6 +1,4 @@
-import { createClient } from '@repo/utils/auth/server'
-import { redirect } from 'next/navigation'
-import { logout } from '@repo/utils/auth/actions'
+import { logout, requireAuth } from '@repo/utils/auth/actions'
 import { Button } from '@repo/ui/button'
 import Link from 'next/link'
 
@@ -9,13 +7,7 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  const supabase = await createClient()
-  const { data: { user }, error } = await supabase.auth.getUser()
-
-  // Redirect to login if not authenticated
-  if (error || !user) {
-    redirect('/login')
-  }
+  const user = await requireAuth()
 
   return (
     <div className="min-h-screen bg-background">
