@@ -9,7 +9,7 @@ import { createBrowserClient } from '@supabase/ssr'
  * @example
  * ```tsx
  * 'use client'
- * import { createClient } from '@repo/utils/auth/client'
+ * import { createClient } from '@repo/auth/lib/client'
  * 
  * export function ClientComponent() {
  *   const supabase = createClient()

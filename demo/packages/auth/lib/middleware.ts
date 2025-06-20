@@ -1,6 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
-import type { ProtectedRouteConfig } from './types'
+import type { ProtectedRouteConfig } from '../schema/auth-schemas'
 
 /**
  * Middleware function to protect routes and manage user sessions
@@ -14,7 +14,7 @@ import type { ProtectedRouteConfig } from './types'
  * ```tsx
  * // middleware.ts
  * import { NextRequest } from 'next/server'
- * import { updateSession } from '@repo/utils/auth/middleware'
+ * import { updateSession } from '@repo/auth/lib/middleware'
  * 
  * export async function middleware(request: NextRequest) {
  *   return await updateSession(request, {

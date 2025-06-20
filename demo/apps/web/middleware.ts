@@ -1,5 +1,5 @@
 import { type NextRequest } from 'next/server'
-import { updateSession } from '@repo/utils/auth/middleware'
+import { updateSession } from '@repo/auth'
 
 export async function middleware(request: NextRequest) {
   return await updateSession(request, {

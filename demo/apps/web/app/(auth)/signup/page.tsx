@@ -1,9 +1,12 @@
-import { AuthForm } from '@repo/ui/auth-form'
+import { AuthForm } from '@repo/auth'
+import { Suspense } from 'react'
 
 export default function SignUpPage() {
   return (
     <div className="flex min-h-screen items-center justify-center">
-      <AuthForm mode="signup" />
+      <Suspense fallback={<div>Loading...</div>}>
+        <AuthForm mode="signup" />
+      </Suspense>
     </div>
   )
 } 

@@ -10,7 +10,7 @@ import { cookies } from 'next/headers'
  * @example
  * ```tsx
  * // In a server component
- * import { createClient } from '@repo/utils/auth/server'
+ * import { createClient } from '@repo/auth/lib/server'
  * 
  * export default async function ServerComponent() {
  *   const supabase = await createClient()

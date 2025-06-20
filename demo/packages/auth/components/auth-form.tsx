@@ -5,16 +5,16 @@ import { useSearchParams } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
-import { login, signup } from '@repo/utils/auth/actions'
-import { LoadingButton } from "../loading-button"
+import { login, signup } from '../actions/actions'
+import { LoadingButton } from "@repo/ui/loading-button"
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "../card"
-import { Input } from "../input"
+} from "@repo/ui/card"
+import { Input } from "@repo/ui/input"
 import {
   Form,
   FormControl,
@@ -22,7 +22,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
-} from "../form"
+} from "@repo/ui/form"
 
 // Base schema for login
 const loginSchema = z.object({

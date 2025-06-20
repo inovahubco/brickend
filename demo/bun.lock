@@ -39,8 +39,8 @@
       "version": "0.1.0",
       "dependencies": {
         "@radix-ui/react-slot": "^1.2.3",
+        "@repo/auth": "*",
         "@repo/ui": "*",
-        "@repo/utils": "*",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "lucide-react": "^0.518.0",
@@ -61,6 +61,30 @@
         "postcss": "^8.5.6",
         "tailwindcss": "^4.1.10",
         "tw-animate-css": "^1.3.4",
+        "typescript": "5.8.2",
+      },
+    },
+    "packages/auth": {
+      "name": "@repo/auth",
+      "version": "0.0.0",
+      "dependencies": {
+        "@hookform/resolvers": "^5.1.1",
+        "@repo/ui": "*",
+        "@supabase/ssr": "^0.5.2",
+        "@supabase/supabase-js": "^2.47.10",
+        "next": "^15.3.0",
+        "react": "^19.1.0",
+        "react-dom": "^19.1.0",
+        "react-hook-form": "^7.58.1",
+        "zod": "^3.25.67",
+      },
+      "devDependencies": {
+        "@repo/eslint-config": "*",
+        "@repo/typescript-config": "*",
+        "@types/node": "^22.15.3",
+        "@types/react": "19.1.0",
+        "@types/react-dom": "19.1.1",
+        "eslint": "^9.29.0",
         "typescript": "5.8.2",
       },
     },
@@ -111,22 +135,6 @@
         "eslint": "^9.29.0",
         "postcss": "^8.5.6",
         "tailwindcss": "^4.1.10",
-        "typescript": "5.8.2",
-      },
-    },
-    "packages/utils": {
-      "name": "@repo/utils",
-      "version": "0.0.0",
-      "dependencies": {
-        "@supabase/ssr": "^0.5.2",
-        "@supabase/supabase-js": "^2.47.18",
-        "next": "^15.3.0",
-      },
-      "devDependencies": {
-        "@repo/eslint-config": "*",
-        "@repo/typescript-config": "*",
-        "@types/node": "^22.15.3",
-        "eslint": "^9.29.0",
         "typescript": "5.8.2",
       },
     },
@@ -258,13 +266,13 @@
 
     "@radix-ui/react-slot": ["@radix-ui/react-slot@1.2.3", "", { "dependencies": { "@radix-ui/react-compose-refs": "1.1.2" }, "peerDependencies": { "@types/react": "*", "react": "^16.8 || ^17.0 || ^18.0 || ^19.0 || ^19.0.0-rc" }, "optionalPeers": ["@types/react"] }, "sha512-aeNmHnBxbi2St0au6VBVC7JXFlhLlOnvIIlePNniyUNAClzmtAUEY8/pBiK3iHjufOlwA+c20/8jngo7xcrg8A=="],
 
+    "@repo/auth": ["@repo/auth@workspace:packages/auth"],
+
     "@repo/eslint-config": ["@repo/eslint-config@workspace:packages/eslint-config"],
 
     "@repo/typescript-config": ["@repo/typescript-config@workspace:packages/typescript-config"],
 
     "@repo/ui": ["@repo/ui@workspace:packages/ui"],
-
-    "@repo/utils": ["@repo/utils@workspace:packages/utils"],
 
     "@standard-schema/utils": ["@standard-schema/utils@0.3.0", "", {}, "sha512-e7Mew686owMaPJVNNLs55PUvgz371nKgwsc4vxE49zsODpJEnxgxRo2y/OKrqueavXgZNMDVj3DdHFlaSAeU8g=="],
 

@@ -1,11 +1,11 @@
-import { createClient } from '@repo/utils/auth/server'
+import { createServerClient } from '@repo/auth'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@repo/ui/card'
 import { Button } from '@repo/ui/button'
 import { Input } from '@repo/ui/input'
 import { Label } from '@repo/ui/label'
 
 export default async function ProfilePage() {
-  const supabase = await createClient()
+  const supabase = await createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   return (

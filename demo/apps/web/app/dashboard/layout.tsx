@@ -1,4 +1,4 @@
-import { logout, requireAuth } from '@repo/utils/auth/actions'
+import { logout, requireAuth } from '@repo/auth'
 import { Button } from '@repo/ui/button'
 import Link from 'next/link'
 

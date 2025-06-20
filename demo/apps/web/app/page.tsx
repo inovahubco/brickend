@@ -1,6 +1,6 @@
 import Image, { type ImageProps } from "next/image";
 import { Button } from "@repo/ui/button";
-import { createClient } from "@repo/utils/auth/server";
+import { createServerClient } from "@repo/auth";
 import Link from "next/link";
 import styles from "./page.module.css";
 
@@ -21,7 +21,7 @@ const ThemeImage = (props: Props) => {
 };
 
 export default async function Home() {
-  const supabase = await createClient()
+  const supabase = await createServerClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   return (

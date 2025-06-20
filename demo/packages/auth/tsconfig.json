@@ -1,5 +1,5 @@
 {
-  "extends": "@repo/typescript-config/base.json",
+  "extends": "@repo/typescript-config/react-library.json",
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
@@ -7,6 +7,6 @@
     },
     "outDir": "dist"
   },
-  "include": ["src"],
+  "include": ["components", "views", "schema", "actions", "lib", "index.ts"],
   "exclude": ["node_modules", "dist"]
 } 

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { createClient } from './server'
+import { createClient } from '../lib/server'
 
 /**
  * Authenticates a user with email and password

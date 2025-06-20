@@ -1,13 +1,10 @@
 {
-  "name": "@repo/utils",
+  "name": "@repo/auth",
   "version": "0.0.0",
   "private": true,
   "exports": {
-    "./auth/client": "./src/auth/client.ts",
-    "./auth/server": "./src/auth/server.ts",
-    "./auth/middleware": "./src/auth/middleware.ts",
-    "./auth/actions": "./src/auth/actions.ts",
-    "./auth/types": "./src/auth/types.ts"
+    "./auth-form": "./components/auth-form.tsx",
+    ".": "./index.ts"
   },
   "scripts": {
     "lint": "eslint . --max-warnings 0",
@@ -17,12 +14,20 @@
     "@repo/eslint-config": "*",
     "@repo/typescript-config": "*",
     "@types/node": "^22.15.3",
+    "@types/react": "19.1.0",
+    "@types/react-dom": "19.1.1",
     "eslint": "^9.29.0",
     "typescript": "5.8.2"
   },
   "dependencies": {
+    "@hookform/resolvers": "^5.1.1",
+    "@repo/ui": "*",
     "@supabase/ssr": "^0.5.2",
-    "@supabase/supabase-js": "^2.47.18",
-    "next": "^15.3.0"
+    "@supabase/supabase-js": "^2.47.10",
+    "next": "^15.3.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-hook-form": "^7.58.1",
+    "zod": "^3.25.67"
   }
 } 
