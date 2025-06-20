@@ -1,0 +1,46 @@
+brickend/ (Meta-repository / File handler)
+├── .git/                       # Single git root
+├── README.md                   # Main project README
+├── .gitignore                  # Global ignores
+│
+├── 🔧 DEV/ (Brickend Development Monorepo)
+│   ├── package.json            # Dev workspace config
+│   ├── turbo.json              # Dev build pipeline
+│   ├── python/
+│   │   └── brickend_python/    # CLI & Core engine
+│   ├── ts/
+│   │   └── brickend_ts/        # TS utilities & CLI
+│   ├── packages/
+│   │   ├── core/               # Shared dev utilities
+│   │   ├── testing/            # Test utilities
+│   │   └── docs/               # Documentation tools
+│   └── apps/
+│       ├── docs/               # Documentation site
+│       └── playground/         # Development playground
+│
+├── 📋 TEMPLATES/ (Template Sources Monorepo)
+│   ├── package.json            # Template workspace config
+│   ├── generators/             # Template generators
+│   ├── fullstack-supabase/     # Complete template
+│   │   ├── package.json        # Template's own workspace
+│   │   ├── apps/web/           # Template Next.js app
+│   │   ├── packages/ui/        # Template packages
+│   │   └── supabase/           # Template Supabase setup
+│   ├── backend-fastapi/        # Backend-only template
+│   └── frontend-nextjs/        # Frontend-only template
+│
+└── 🚀 DEMO/ (Live Demo Monorepo)
+    ├── package.json            # Demo workspace config
+    ├── turbo.json              # Demo build pipeline
+    ├── apps/
+    │   ├── web/                # Working Next.js demo
+    │   └── api/                # Working API demo
+    ├── packages/
+    │   ├── ui/                 # Working UI components
+    │   ├── auth/               # Working auth package
+    │   └── database/           # Working DB package
+    ├── supabase/
+    │   ├── migrations/         # Real migrations
+    │   ├── functions/          # Real edge functions
+    │   └── config.toml         # Real config
+    └── .env.local              # Real environment

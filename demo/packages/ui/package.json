@@ -3,7 +3,14 @@
   "version": "0.0.0",
   "private": true,
   "exports": {
-    "./*": "./src/*.tsx"
+    "./button": "./src/components/ui/button.tsx",
+    "./card": "./src/components/ui/card.tsx",
+    "./input": "./src/components/ui/input.tsx",
+    "./label": "./src/components/ui/label.tsx",
+    "./form": "./src/components/ui/form.tsx",
+    "./loading-button": "./src/components/ui/loading-button.tsx",
+    "./auth-form": "./src/components/ui/auth/auth-form.tsx",
+    "./lib/utils": "./src/lib/utils.ts"
   },
   "scripts": {
     "lint": "eslint . --max-warnings 0",
@@ -13,15 +20,26 @@
   "devDependencies": {
     "@repo/eslint-config": "*",
     "@repo/typescript-config": "*",
+    "@tailwindcss/postcss": "^4.1.10",
     "@turbo/gen": "^2.5.0",
     "@types/node": "^22.15.3",
     "@types/react": "19.1.0",
     "@types/react-dom": "19.1.1",
     "eslint": "^9.29.0",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.10",
     "typescript": "5.8.2"
   },
   "dependencies": {
+    "@hookform/resolvers": "^5.1.1",
+    "@radix-ui/react-label": "^2.1.7",
+    "@radix-ui/react-slot": "^1.2.3",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "react-hook-form": "^7.58.1",
+    "tailwind-merge": "^3.3.1",
+    "zod": "^3.25.67"
   }
 }

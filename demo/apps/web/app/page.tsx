@@ -1,5 +1,7 @@
 import Image, { type ImageProps } from "next/image";
 import { Button } from "@repo/ui/button";
+import { createClient } from "@repo/utils/auth/server";
+import Link from "next/link";
 import styles from "./page.module.css";
 
 type Props = Omit<ImageProps, "src"> & {
@@ -18,7 +20,10 @@ const ThemeImage = (props: Props) => {
   );
 };
 
-export default function Home() {
+export default async function Home() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
   return (
     <div className={styles.page}>
       <main className={styles.main}>
@@ -63,9 +68,33 @@ export default function Home() {
             Read our docs
           </a>
         </div>
-        <Button appName="web" className={styles.secondary}>
-          Open alert
-        </Button>
+        <div className="flex gap-4 mt-8">
+          {user ? (
+            <>
+              <Button asChild>
+                <Link href="/dashboard">
+                  Go to Dashboard
+                </Link>
+              </Button>
+              <p className="text-sm text-muted-foreground self-center">
+                Welcome back, {user.email}!
+              </p>
+            </>
+          ) : (
+            <>
+              <Button asChild>
+                <Link href="/login">
+                  Sign In
+                </Link>
+              </Button>
+              <Button variant="outline" asChild>
+                <Link href="/signup">
+                  Sign Up
+                </Link>
+              </Button>
+            </>
+          )}
+        </div>
       </main>
       <footer className={styles.footer}>
         <a
