@@ -4,8 +4,13 @@ import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
-import * as z from "zod"
 import { login, signup } from '../actions/actions'
+import { 
+  LoginCredentialsSchema, 
+  SignUpFormSchema,
+  type LoginCredentials,
+  type SignUpForm
+} from '../schema/auth-schemas'
 import { LoadingButton } from "@repo/ui/loading-button"
 import {
   Card,
@@ -24,31 +29,6 @@ import {
   FormMessage,
 } from "@repo/ui/form"
 
-// Base schema for login
-const loginSchema = z.object({
-  email: z
-    .string()
-    .min(1, "El correo electrónico es obligatorio")
-    .email("Ingresa un correo electrónico válido"),
-  password: z
-    .string()
-    .min(1, "La contraseña es obligatoria")
-    .min(6, "La contraseña debe tener al menos 6 caracteres"),
-})
-
-// Extended schema for signup
-const signupSchema = loginSchema.extend({
-  confirmPassword: z
-    .string()
-    .min(1, "Confirma tu contraseña"),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Las contraseñas no coinciden",
-  path: ["confirmPassword"],
-})
-
-type LoginFormValues = z.infer<typeof loginSchema>
-type SignupFormValues = z.infer<typeof signupSchema>
-
 type AuthFormProps = {
   mode: 'login' | 'signup'
 }
@@ -57,7 +37,7 @@ export function AuthForm({ mode }: AuthFormProps) {
   const isLogin = mode === 'login'
   const searchParams = useSearchParams()
   
-  const schema = isLogin ? loginSchema : signupSchema
+  const schema = isLogin ? LoginCredentialsSchema : SignUpFormSchema
   const defaultValues = isLogin ? {
     email: searchParams.get('email') || '',
     password: '',
@@ -67,12 +47,12 @@ export function AuthForm({ mode }: AuthFormProps) {
     confirmPassword: '',
   }
 
-  const form = useForm<LoginFormValues | SignupFormValues>({
+  const form = useForm<LoginCredentials | SignUpForm>({
     resolver: zodResolver(schema),
     defaultValues,
   })
 
-  async function onSubmit(values: LoginFormValues | SignupFormValues) {
+  async function onSubmit(values: LoginCredentials | SignUpForm) {
     const formData = new FormData()
     formData.append('email', values.email)
     formData.append('password', values.password)

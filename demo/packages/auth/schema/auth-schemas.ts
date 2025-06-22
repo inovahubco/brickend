@@ -24,9 +24,15 @@ export const AuthStateSchema = z.object({
  */
 export const LoginCredentialsSchema = z.object({
   /** User's email address */
-  email: z.string().email('Please enter a valid email address'),
+  email: z
+    .string()
+    .min(1, "El correo electrónico es obligatorio")
+    .email("Ingresa un correo electrónico válido"),
   /** User's password */
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  password: z
+    .string()
+    .min(1, "La contraseña es obligatoria")
+    .min(6, "La contraseña debe tener al menos 6 caracteres"),
 })
 
 /**
@@ -35,14 +41,33 @@ export const LoginCredentialsSchema = z.object({
  */
 export const SignUpCredentialsSchema = z.object({
   /** User's email address */
-  email: z.string().email('Please enter a valid email address'),
+  email: z
+    .string()
+    .min(1, "El correo electrónico es obligatorio")
+    .email("Ingresa un correo electrónico válido"),
   /** User's chosen password */
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  password: z
+    .string()
+    .min(1, "La contraseña es obligatoria")
+    .min(6, "La contraseña debe tener al menos 6 caracteres"),
   /** Optional additional data to store with the user */
   options: z.object({
     /** Custom user metadata */
     data: z.record(z.unknown()).optional(),
   }).optional(),
+})
+
+/**
+ * Schema for signup forms with password confirmation
+ * Includes password confirmation validation
+ */
+export const SignUpFormSchema = SignUpCredentialsSchema.extend({
+  confirmPassword: z
+    .string()
+    .min(1, "Confirma tu contraseña"),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Las contraseñas no coinciden",
+  path: ["confirmPassword"],
 })
 
 /**
@@ -126,6 +151,12 @@ export type LoginCredentials = z.infer<typeof LoginCredentialsSchema>
 export type SignUpCredentials = z.infer<typeof SignUpCredentialsSchema>
 
 /**
+ * Signup form data with password confirmation
+ * Inferred from SignUpFormSchema
+ */
+export type SignUpForm = z.infer<typeof SignUpFormSchema>
+
+/**
  * Standardized error object for authentication operations
  * Inferred from AuthErrorSchema
  */
@@ -171,6 +202,16 @@ export const validateLoginCredentials = (data: unknown): LoginCredentials => {
  */
 export const validateSignUpCredentials = (data: unknown): SignUpCredentials => {
   return SignUpCredentialsSchema.parse(data)
+}
+
+/**
+ * Validates and parses signup form data with password confirmation
+ * @param data - Raw data to validate
+ * @returns Parsed and validated signup form data
+ * @throws ZodError if validation fails
+ */
+export const validateSignUpForm = (data: unknown): SignUpForm => {
+  return SignUpFormSchema.parse(data)
 }
 
 /**

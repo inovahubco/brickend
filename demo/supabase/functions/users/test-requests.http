@@ -1,0 +1,189 @@
+###
+# Users Edge Function - Test Requests
+# Archivo para probar todos los endpoints de la función users
+# Usa con extensiones como REST Client en VS Code
+###
+
+@baseUrl = http://127.0.0.1:54321/functions/v1/users
+@authToken = test-token-2024
+
+### 1. Crear un nuevo perfil de usuario
+POST {{baseUrl}}
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "username": "johndoe2024",
+  "first_name": "John",
+  "last_name": "Doe",
+  "date_of_birth": "1990-01-15",
+  "gender": "male",
+  "phone": "+57 300 123 4567",
+  "address_line1": "Calle 123 #45-67",
+  "city": "Bogotá",
+  "state": "Cundinamarca",
+  "postal_code": "110111",
+  "country": "Colombia",
+  "preferences": {
+    "theme": "dark",
+    "language": "es",
+    "notifications": {
+      "email": true,
+      "push": false
+    }
+  },
+  "bio": "Software developer passionate about technology",
+  "website": "https://johndoe.dev",
+  "occupation": "Software Engineer",
+  "is_profile_public": true
+}
+
+### 2. Obtener mi perfil
+GET {{baseUrl}}/me
+Authorization: Bearer {{authToken}}
+
+### 3. Listar todos los perfiles (primera página)
+GET {{baseUrl}}?page=1&limit=10
+Authorization: Bearer {{authToken}}
+
+### 4. Listar perfiles con filtros y búsqueda
+GET {{baseUrl}}?page=1&limit=5&search=john&gender=male&country=Colombia&sort_by=username&sort_order=asc
+Authorization: Bearer {{authToken}}
+
+### 5. Listar solo perfiles públicos
+GET {{baseUrl}}?is_profile_public=true&sort_by=created_at&sort_order=desc
+Authorization: Bearer {{authToken}}
+
+### 6. Obtener perfil por ID específico
+# Reemplaza {profile_id} con un UUID real de tu base de datos
+GET {{baseUrl}}/01234567-89ab-cdef-0123-456789abcdef
+Authorization: Bearer {{authToken}}
+
+### 7. Actualizar mi perfil completo
+PUT {{baseUrl}}/me
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "first_name": "John Updated",
+  "last_name": "Doe Smith",
+  "bio": "Senior Software Developer with 5+ years of experience",
+  "website": "https://johnsmith.dev",
+  "occupation": "Senior Software Engineer",
+  "preferences": {
+    "theme": "light",
+    "language": "en",
+    "notifications": {
+      "email": true,
+      "push": true,
+      "sms": false
+    },
+    "privacy": {
+      "show_email": false,
+      "show_phone": false
+    }
+  }
+}
+
+### 8. Actualización parcial de mi perfil
+PUT {{baseUrl}}/me
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "bio": "Just updated my bio!",
+  "is_profile_public": false
+}
+
+### 9. Actualizar perfil por ID específico
+# Reemplaza {profile_id} con un UUID real de tu base de datos
+PUT {{baseUrl}}/01234567-89ab-cdef-0123-456789abcdef
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "bio": "Profile updated via ID endpoint"
+}
+
+### 10. Eliminar mi perfil (soft delete)
+DELETE {{baseUrl}}/me
+Authorization: Bearer {{authToken}}
+
+### 11. Eliminar perfil por ID (soft delete)
+# Reemplaza {profile_id} con un UUID real de tu base de datos
+DELETE {{baseUrl}}/01234567-89ab-cdef-0123-456789abcdef
+Authorization: Bearer {{authToken}}
+
+### 12. Restaurar perfil eliminado
+# Reemplaza {profile_id} con un UUID real de un perfil eliminado
+POST {{baseUrl}}/01234567-89ab-cdef-0123-456789abcdef/restore
+Authorization: Bearer {{authToken}}
+
+### 13. Manejo de errores - Request sin autenticación
+GET {{baseUrl}}/me
+
+### 14. Manejo de errores - Token inválido
+GET {{baseUrl}}/me
+Authorization: Bearer invalid-token
+
+### 15. Manejo de errores - Crear perfil con datos inválidos
+POST {{baseUrl}}
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "username": "ab",
+  "first_name": "",
+  "date_of_birth": "invalid-date",
+  "gender": "invalid-gender",
+  "avatar_url": "not-a-url",
+  "website": "also-not-a-url"
+}
+
+### 16. Manejo de errores - Crear perfil duplicado
+POST {{baseUrl}}
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "username": "johndoe2024",
+  "first_name": "Another",
+  "last_name": "User"
+}
+
+### 17. Manejo de errores - Endpoint no existente
+GET {{baseUrl}}/nonexistent
+Authorization: Bearer {{authToken}}
+
+### 18. Manejo de errores - Método no permitido
+PATCH {{baseUrl}}/me
+Authorization: Bearer {{authToken}}
+
+### 19. Prueba de CORS - OPTIONS request
+OPTIONS {{baseUrl}}
+
+### 20. Búsqueda avanzada - Por ocupación en bio
+GET {{baseUrl}}?search=developer&limit=20
+Authorization: Bearer {{authToken}}
+
+###
+# Notas para las pruebas:
+# 
+# 1. Asegúrate de que Supabase esté corriendo localmente:
+#    supabase start
+#
+# 2. Despliega la función antes de probar:
+#    supabase functions deploy users
+#
+# 3. Reemplaza los UUIDs de ejemplo con IDs reales de tu base de datos
+#
+# 4. El token 'test-token-2024' es hardcodeado para pruebas
+#
+# 5. Para generar un JWT personalizado, usa la función generateTestJWT
+#    en el archivo auth.ts
+#
+# 6. Ejecuta las requests en orden para probar el flujo completo
+#
+# 7. Verifica los logs de la función para debug:
+#    supabase functions logs users
+### 
