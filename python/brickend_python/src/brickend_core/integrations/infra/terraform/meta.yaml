@@ -1,0 +1,29 @@
+name: terraform
+category: infra
+description: "Terraform - Infrastructure as Code for multi-cloud deployments"
+version: "0.1.0"
+status: "planned"
+dependencies:
+  - python-terraform>=0.10.1
+author: "Brickend Team"
+maintainer: ""
+tags: ["terraform", "cloud", "infrastructure", "iac", "multi-cloud"]
+documentation_url: ""
+repository_url: ""
+license: "MIT"
+python_version: ">=3.11"
+supported_providers:
+  - aws
+  - azure
+  - gcp
+  - digitalocean
+features:
+  - "Multi-cloud support"
+  - "State management"
+  - "Resource provisioning"
+  - "Infrastructure planning"
+components:
+  - main
+  - variables
+  - outputs
+  - providers

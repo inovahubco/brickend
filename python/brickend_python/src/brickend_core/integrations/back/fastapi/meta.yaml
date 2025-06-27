@@ -1,0 +1,36 @@
+name: fastapi
+category: back
+description: "FastAPI + SQLAlchemy + Alembic - High-performance async API framework"
+version: "1.0.0"
+status: "stable"
+dependencies:
+  - fastapi>=0.104.0
+  - sqlalchemy>=2.0.0
+  - alembic>=1.13.0
+  - pydantic>=2.0.0
+  - uvicorn>=0.24.0
+  - psycopg2-binary>=2.9.0
+author: "Brickend Team"
+maintainer: ""
+tags: ["api", "rest", "async", "python", "sqlalchemy", "alembic"]
+documentation_url: ""
+repository_url: ""
+license: "MIT"
+python_version: ">=3.11"
+supported_databases:
+  - postgresql
+  - sqlite
+  - mysql
+features:
+  - "Automatic CRUD generation"
+  - "Database migrations with Alembic"
+  - "Pydantic schemas validation"
+  - "OpenAPI documentation"
+  - "Async/await support"
+components:
+  - models
+  - schemas
+  - crud
+  - router
+  - main
+  - db

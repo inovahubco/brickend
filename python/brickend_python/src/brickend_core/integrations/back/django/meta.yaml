@@ -1,0 +1,35 @@
+name: django
+category: back
+description: "Django REST Framework + PostgreSQL - Robust web framework for perfectionists"
+version: "0.1.0"
+status: "coming_soon"
+dependencies:
+  - django>=4.2.0
+  - djangorestframework>=3.14.0
+  - psycopg2-binary>=2.9.0
+  - django-filter>=23.0
+  - django-cors-headers>=4.0.0
+author: "Brickend Team"
+maintainer: ""
+tags: ["api", "rest", "orm", "python", "django", "drf"]
+documentation_url: ""
+repository_url: ""
+license: "MIT"
+python_version: ">=3.11"
+supported_databases:
+  - postgresql
+  - sqlite
+  - mysql
+features:
+  - "Django ORM models"
+  - "DRF serializers and viewsets"
+  - "Django admin integration"
+  - "Built-in authentication"
+  - "Database migrations"
+components:
+  - models
+  - serializers
+  - viewsets
+  - urls
+  - admin
+  - migrations

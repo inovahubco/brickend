@@ -87,7 +87,6 @@ class EntitiesFile(BaseModel):
     @field_validator("entities")
     @classmethod
     def validate_entities_non_empty(cls, v: List[EntityConfig]) -> List[EntityConfig]:
-        """Ensure that the `entities` list contains at least one entity."""
-        if not v:
-            raise ValueError("The 'entities' list must contain at least one entity.")
+        """Validate entities list structure."""
+        # Allow empty lists for initialization, but warn in other contexts
         return v

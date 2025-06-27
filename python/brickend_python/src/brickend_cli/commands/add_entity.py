@@ -1,112 +1,131 @@
 """
 add_entity.py
 
-CLI command to interactively add a new entity definition to entities.yaml.
+CLI command to interactively add a new entity definition to project configuration.
 
-This module provides a Typer command (`add_entity`) that guides the user through:
-  - Locating or creating an `entities.yaml` file in the current directory.
-  - Prompting for a new entity name and its fields.
-  - Validating the updated entity list against the Pydantic schema.
-  - Writing the updated configuration back to `entities.yaml`.
+This module provides a Typer command (`add_entity`) that supports hybrid configuration:
+  - Modern mode: Works with brickend.yaml (inline or external entities)
+  - Legacy mode: Works directly with entities.yaml
+
+The command guides the user through:
+  - Detecting project configuration mode
+  - Prompting for a new entity name and its fields
+  - Validating the updated entity list against Pydantic schemas
+  - Writing the updated configuration back to the appropriate file
 """
 
 import typer
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import List, Optional
 
 import ruamel.yaml
 from pydantic import ValidationError
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
+from rich.prompt import Prompt, Confirm, IntPrompt
 
-from brickend_core.config.validation_schemas import EntitiesFile
+from brickend_core.config.validation_schemas import EntitiesFile, EntityConfig, FieldConfig
+from brickend_core.config.project_schema import BrickendProject
+from brickend_core.utils.yaml_loader import load_project_config, save_project_config
 from brickend_core.utils.naming import validate_name
 
 app = typer.Typer(add_completion=False)
+console = Console()
 
 
-def find_entities_file() -> Path:
-    """Locate the `entities.yaml` file in the current working directory.
+def detect_project_mode() -> tuple[str, Path, Optional[BrickendProject]]:
+    """
+    Detect project configuration mode and return appropriate information.
 
     Returns:
-        Path: Path object pointing to `entities.yaml`.
-
-    Raises:
-        FileNotFoundError: If `entities.yaml` is not present in the cwd.
+        Tuple of (mode, file_path, config):
+        - mode: "hybrid_external", "hybrid_inline", or "legacy"
+        - file_path: Path to file that should be modified
+        - config: BrickendProject object (None for legacy mode)
     """
-    entities_path = Path.cwd() / "entities.yaml"
-    if not entities_path.exists():
-        raise FileNotFoundError("entities.yaml not found in the current directory.")
-    return entities_path
+    try:
+        # Try to load modern configuration
+        config = load_project_config()
+
+        if config.is_entities_external():
+            # External entities mode
+            entities_file_path = config.get_entities_file_path()
+            return "hybrid_external", entities_file_path, config
+        else:
+            # Inline entities mode
+            return "hybrid_inline", Path("brickend.yaml"), config
+
+    except FileNotFoundError:
+        # No brickend.yaml found, try legacy mode
+        entities_path = Path("entities.yaml")
+        if entities_path.exists():
+            return "legacy", entities_path, None
+        else:
+            # No configuration found
+            raise FileNotFoundError(
+                "No project configuration found. "
+                "Run 'brickend init' to create a new project or ensure you're in a Brickend project directory."
+            )
 
 
-def prompt_field_definitions(num_fields: int) -> List[Dict[str, Any]]:
-    """Interactively prompt the user to define each field for a new entity.
+def prompt_field_definitions(num_fields: int) -> List[FieldConfig]:
+    """
+    Interactively prompt the user to define each field for a new entity.
 
     Args:
-        num_fields (int): Number of fields to prompt for.
+        num_fields: Number of fields to prompt for
 
     Returns:
-        List[Dict[str, Any]]: A list of field-definition dictionaries, each containing:
-            - name (str)
-            - type (str)
-            - primary_key (bool)
-            - unique (bool)
-            - nullable (bool)
-            - default (Optional[str])
-            - foreign_key (Optional[str])
-            - constraints (List[str])
+        List of FieldConfig objects
     """
     allowed_types = ["uuid", "string", "text", "integer", "float", "boolean", "datetime"]
-    fields: List[Dict[str, Any]] = []
+    fields: List[FieldConfig] = []
 
     for i in range(1, num_fields + 1):
-        typer.echo(f"\n--- Field {i} ---")
-        # Name
+        console.print(f"\n[bold cyan]--- Field {i} ---[/bold cyan]")
+
+        # Field name
         while True:
-            field_name = typer.prompt("Field name (snake_case)")
+            field_name = Prompt.ask("Field name (snake_case)")
             if not validate_name(field_name):
-                typer.echo(
-                    "Invalid field name. Must start with a letter and contain only letters, digits, or underscores."
+                console.print(
+                    "[red]Invalid field name. Must start with a letter and contain only letters, digits, or underscores.[/red]"
                 )
                 continue
             break
 
-        # Type
+        # Field type
         while True:
-            field_type = typer.prompt(f"Field type (choose from {', '.join(allowed_types)})").lower()
-            if field_type not in allowed_types:
-                typer.echo(f"Invalid type. Please choose one of: {', '.join(allowed_types)}")
-                continue
+            field_type = Prompt.ask(
+                f"Field type",
+                choices=allowed_types,
+                default="string"
+            ).lower()
             break
 
-        # Primary key?
-        pk_input = typer.prompt("Is this field a primary key? [y/N]").lower()
-        is_primary_key = pk_input.startswith("y")
+        is_primary_key = Confirm.ask("Is this field a primary key?", default=False)
 
-        # Unique?
-        unique_input = typer.prompt("Is this field unique? [y/N]").lower()
-        is_unique = unique_input.startswith("y")
+        is_unique = Confirm.ask("Is this field unique?", default=False)
 
-        # Nullable (non-nullable if primary key)
         if is_primary_key:
             is_nullable = False
-            typer.echo("Primary key fields are not nullable by default.")
+            console.print("[yellow]Primary key fields are not nullable by default.[/yellow]")
         else:
-            nullable_input = typer.prompt("Is this field nullable? [Y/n]").lower()
-            is_nullable = not nullable_input.startswith("n")
+            is_nullable = Confirm.ask("Is this field nullable?", default=True)
 
-        # Default value
-        default_value = typer.prompt("Default value (leave blank for none)", default="")
+        default_value = Prompt.ask("Default value (leave blank for none)", default="")
         default_val = default_value if default_value.strip() != "" else None
 
-        # Foreign key
-        foreign_key = typer.prompt(
-            "Foreign key (format: OtherEntity.field, leave blank for none)", default=""
+        foreign_key = Prompt.ask(
+            "Foreign key (format: OtherEntity.field, leave blank for none)",
+            default=""
         )
         fk_val = foreign_key if foreign_key.strip() != "" else None
 
-        # Additional constraints
-        constraints_input = typer.prompt(
-            "Constraints (comma-separated, leave blank for none)", default=""
+        constraints_input = Prompt.ask(
+            "Constraints (comma-separated, leave blank for none)",
+            default=""
         )
         constraints = (
             [c.strip() for c in constraints_input.split(",") if c.strip()]
@@ -114,116 +133,301 @@ def prompt_field_definitions(num_fields: int) -> List[Dict[str, Any]]:
             else []
         )
 
-        fields.append(
-            {
-                "name": field_name,
-                "type": field_type,
-                "primary_key": is_primary_key,
-                "unique": is_unique,
-                "nullable": is_nullable,
-                "default": default_val,
-                "foreign_key": fk_val,
-                "constraints": constraints,
-            }
-        )
+        try:
+            field = FieldConfig(
+                name=field_name,
+                type=field_type,
+                primary_key=is_primary_key,
+                unique=is_unique,
+                nullable=is_nullable,
+                default=default_val,
+                foreign_key=fk_val,
+                constraints=constraints,
+            )
+            fields.append(field)
+
+        except ValidationError as e:
+            console.print(f"[red]Field validation error: {e}[/red]")
+            console.print("[yellow]Please try again with valid values.[/yellow]")
+            i -= 1
+            continue
 
     return fields
 
 
-@app.command("entity")
-def add_entity() -> None:
-    """Typer command to add a new entity entry to `entities.yaml`.
+def display_entity_preview(entity: EntityConfig) -> None:
+    """Display a preview of the entity before saving."""
+    table = Table(title=f"Entity: {entity.name}")
+    table.add_column("Field", style="cyan")
+    table.add_column("Type", style="green")
+    table.add_column("Constraints", style="yellow")
 
-    This command will:
-      1. Locate an existing `entities.yaml` (or abort if not found).
-      2. Load and parse its content.
-      3. Prompt for a unique entity name (PascalCase).
-      4. Prompt for the number of fields and their definitions.
-      5. Validate the updated entities against the Pydantic schema.
-      6. Write the updated configuration back to disk.
+    for field in entity.fields:
+        constraints = []
+        if field.primary_key:
+            constraints.append("PK")
+        if field.unique:
+            constraints.append("UNIQUE")
+        if not field.nullable:
+            constraints.append("NOT NULL")
+        if field.foreign_key:
+            constraints.append(f"FK({field.foreign_key})")
+        if field.default:
+            constraints.append(f"DEFAULT({field.default})")
 
-    Raises:
-        typer.Exit: On any error (file not found, parse error, validation error, or write error),
-                    exits with non-zero status after displaying an error message.
-    """
-    # Step 1: find or abort
-    try:
-        entities_path = find_entities_file()
-    except FileNotFoundError as e:
-        typer.echo(f"Error: {e}")
-        raise typer.Exit(code=1)
+        table.add_row(
+            field.name,
+            field.type,
+            ", ".join(constraints) if constraints else "—"
+        )
 
-    # Step 2: load YAML
+    console.print(table)
+
+
+def save_entity_hybrid_external(entity: EntityConfig, entities_file_path: Path) -> None:
+    """Save entity to external entities file."""
+    # Load existing entities file
     yaml = ruamel.yaml.YAML()
-    try:
-        with entities_path.open("r", encoding="utf-8") as f:
-            data = yaml.load(f) or {}
-    except ruamel.yaml.YAMLError as ye:
-        typer.echo(f"Error parsing entities.yaml: {ye}")
-        raise typer.Exit(code=1)
+    yaml.default_flow_style = False
+    yaml.width = 120
+    yaml.indent(mapping=2, sequence=4, offset=2)
 
-    # Ensure 'entities' key
-    entities_list = data.get("entities")
-    if entities_list is None:
+    try:
+        if entities_file_path.exists():
+            with entities_file_path.open("r", encoding="utf-8") as f:
+                data = yaml.load(f) or {}
+        else:
+            data = {}
+    except ruamel.yaml.YAMLError as e:
+        raise ValueError(f"Error parsing entities file: {e}")
+
+    # Ensure entities list exists
+    entities_list = data.get("entities", [])
+    if not isinstance(entities_list, list):
         entities_list = []
-        data["entities"] = entities_list
-    elif not isinstance(entities_list, list):
-        typer.echo("Error: 'entities' key exists but is not a list.")
-        raise typer.Exit(code=1)
 
-    # Step 3: prompt entity name
-    while True:
-        entity_name = typer.prompt("\nEntity name (PascalCase)")
-        if not validate_name(entity_name):
-            typer.echo(
-                "Invalid entity name. Must start with a letter and contain only letters, digits, or underscores."
-            )
-            continue
-        break
+    # Remove existing entity with same name
+    entities_list = [e for e in entities_list if e.get("name") != entity.name]
 
-    # Handle overwrite if exists
-    existing = next((e for e in entities_list if e.get("name") == entity_name), None)
-    if existing:
-        overwrite = typer.prompt(
-            f"Entity '{entity_name}' already exists. Overwrite? [y/N]"
-        ).lower()
-        if not overwrite.startswith("y"):
-            typer.echo("Aborting without changes.")
-            raise typer.Exit(code=0)
-        entities_list = [e for e in entities_list if e.get("name") != entity_name]
-        data["entities"] = entities_list
+    # Add new entity
+    entities_list.append(entity.model_dump())
+    data["entities"] = entities_list
 
-    # Step 4: number of fields
-    while True:
-        try:
-            num_fields = int(typer.prompt("\nNumber of fields (integer >= 1)"))
-            if num_fields < 1:
-                raise ValueError()
-            break
-        except ValueError:
-            typer.echo("Please enter a valid integer >= 1.")
-
-    # Step 5: prompt field definitions
-    fields = prompt_field_definitions(num_fields)
-    new_entity: Dict[str, Any] = {"name": entity_name, "fields": fields}
-
-    updated_entities = entities_list + [new_entity]
-
-    # Step 6: validate against Pydantic schema
+    # Validate complete file
     try:
-        EntitiesFile.model_validate({"entities": updated_entities})
-    except ValidationError as ve:
-        typer.echo(f"Validation error: {ve}")
-        raise typer.Exit(code=1)
+        EntitiesFile.model_validate(data)
+    except ValidationError as e:
+        raise ValueError(f"Entities file validation error: {e}")
 
-    data["entities"] = updated_entities
+    # Save file
+    try:
+        with entities_file_path.open("w", encoding="utf-8") as f:
+            yaml.dump(data, f)
+    except Exception as e:
+        raise OSError(f"Error writing entities file: {e}")
 
-    # Step 7: write file
+
+def save_entity_hybrid_inline(entity: EntityConfig, config: BrickendProject) -> None:
+    """Save entity to inline entities in brickend.yaml."""
+    # Add entity to inline list
+    if not isinstance(config.entities, list):
+        config.entities = []
+
+    # Remove existing entity with same name
+    config.entities = [e for e in config.entities if e.name != entity.name]
+
+    # Add new entity
+    config.entities.append(entity)
+
+    # Save updated config
+    try:
+        save_project_config(config)
+    except Exception as e:
+        raise OSError(f"Error saving project configuration: {e}")
+
+
+def save_entity_legacy(entity: EntityConfig, entities_path: Path) -> None:
+    """Save entity using legacy mode (direct entities.yaml)."""
+    yaml = ruamel.yaml.YAML()
+    yaml.default_flow_style = False
+
+    try:
+        if entities_path.exists():
+            with entities_path.open("r", encoding="utf-8") as f:
+                data = yaml.load(f) or {}
+        else:
+            data = {}
+    except ruamel.yaml.YAMLError as e:
+        raise ValueError(f"Error parsing entities.yaml: {e}")
+
+    # Ensure entities list
+    entities_list = data.get("entities", [])
+    if not isinstance(entities_list, list):
+        entities_list = []
+
+    # Remove existing entity with same name
+    entities_list = [e for e in entities_list if e.get("name") != entity.name]
+
+    # Add new entity
+    entities_list.append(entity.model_dump())
+    data["entities"] = entities_list
+
+    # Validate
+    try:
+        EntitiesFile.model_validate(data)
+    except ValidationError as e:
+        raise ValueError(f"Validation error: {e}")
+
+    # Save
     try:
         with entities_path.open("w", encoding="utf-8") as f:
             yaml.dump(data, f)
     except Exception as e:
-        typer.echo(f"Error writing to entities.yaml: {e}")
+        raise OSError(f"Error writing to entities.yaml: {e}")
+
+
+@app.command("entity")
+def add_entity(
+    name: Optional[str] = typer.Option(None, "--name", "-n", help="Entity name (PascalCase)"),
+    non_interactive: bool = typer.Option(False, "--non-interactive", help="Skip interactive prompts"),
+) -> None:
+    """
+    Add a new entity to your Brickend project.
+
+    Supports both modern (brickend.yaml) and legacy (entities.yaml) project configurations.
+    The command automatically detects your project structure and updates the appropriate files.
+
+    In interactive mode (default), you'll be guided through defining the entity and its fields.
+    Use --non-interactive for scripted usage (requires --name and other parameters).
+
+    Examples:
+        brickend add entity                    # Interactive mode
+        brickend add entity --name User        # Pre-fill entity name
+    """
+
+    console.print(Panel(
+        "[bold blue]Add Entity to Brickend Project[/bold blue]\n"
+        "Define a new data model for your application",
+        title="🏗️ Entity Builder",
+        border_style="blue"
+    ))
+
+    # Step 1: Detect project configuration mode
+    try:
+        mode, file_path, config = detect_project_mode()
+    except FileNotFoundError as e:
+        console.print(f"[red]Error: {e}[/red]")
         raise typer.Exit(code=1)
 
-    typer.echo(f"\n✅ Entity '{entity_name}' added to entities.yaml.")
+    # Display current mode
+    mode_info = {
+        "hybrid_external": f"Modern project (external entities in {file_path.name})",
+        "hybrid_inline": "Modern project (inline entities in brickend.yaml)",
+        "legacy": "Legacy project (entities.yaml)"
+    }
+
+    console.print(f"[green]Project mode:[/green] {mode_info[mode]}")
+    console.print(f"[green]Target file:[/green] {file_path}")
+
+    # Step 2: Get entity name
+    if not name:
+        while True:
+            name = Prompt.ask("\n[bold]Entity name[/bold] (PascalCase)")
+            if not validate_name(name):
+                console.print(
+                    "[red]Invalid entity name. Must start with a letter and contain only letters, digits, or underscores.[/red]"
+                )
+                continue
+            break
+
+    # Check for existing entity
+    existing_entities = []
+    if mode == "hybrid_external":
+        try:
+            if file_path.exists():
+                yaml = ruamel.yaml.YAML()
+                with file_path.open("r", encoding="utf-8") as f:
+                    data = yaml.load(f) or {}
+                existing_entities = [e.get("name") for e in data.get("entities", [])]
+        except Exception:
+            pass
+    elif mode == "hybrid_inline":
+        existing_entities = [e.name for e in config.entities]
+    elif mode == "legacy":
+        try:
+            if file_path.exists():
+                yaml = ruamel.yaml.YAML()
+                with file_path.open("r", encoding="utf-8") as f:
+                    data = yaml.load(f) or {}
+                existing_entities = [e.get("name") for e in data.get("entities", [])]
+        except Exception:
+            pass
+
+    if name in existing_entities:
+        if not Confirm.ask(f"\n[yellow]Entity '{name}' already exists. Overwrite?[/yellow]", default=False):
+            console.print("[yellow]Cancelled.[/yellow]")
+            raise typer.Exit(code=0)
+
+    # Step 3: Get number of fields
+    if non_interactive:
+        console.print("[red]Non-interactive mode requires implementation of field specification via CLI args[/red]")
+        console.print("[yellow]For now, please use interactive mode[/yellow]")
+        raise typer.Exit(code=1)
+
+    while True:
+        try:
+            num_fields = IntPrompt.ask("\n[bold]Number of fields[/bold]", default=1)
+            if num_fields < 1:
+                console.print("[red]Must have at least 1 field[/red]")
+                continue
+            break
+        except ValueError:
+            console.print("[red]Please enter a valid number[/red]")
+
+    # Step 4: Define fields interactively
+    try:
+        fields = prompt_field_definitions(num_fields)
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Cancelled by user.[/yellow]")
+        raise typer.Exit(code=0)
+
+    # Step 5: Create and validate entity
+    try:
+        entity = EntityConfig(name=name, fields=fields)
+    except ValidationError as e:
+        console.print(f"[red]Entity validation error: {e}[/red]")
+        raise typer.Exit(code=1)
+
+    # Step 6: Preview entity
+    console.print("\n[bold green]Entity Preview:[/bold green]")
+    display_entity_preview(entity)
+
+    if not Confirm.ask("\n[bold]Save this entity?[/bold]", default=True):
+        console.print("[yellow]Cancelled.[/yellow]")
+        raise typer.Exit(code=0)
+
+    # Step 7: Save entity based on mode
+    try:
+        if mode == "hybrid_external":
+            save_entity_hybrid_external(entity, file_path)
+        elif mode == "hybrid_inline":
+            save_entity_hybrid_inline(entity, config)
+        elif mode == "legacy":
+            save_entity_legacy(entity, file_path)
+
+    except (ValueError, OSError) as e:
+        console.print(f"[red]Error saving entity: {e}[/red]")
+        raise typer.Exit(code=1)
+
+    # Step 8: Success message
+    console.print(Panel(
+        f"[bold green]✅ Entity '{name}' added successfully![/bold green]\n\n"
+        f"[bold]Configuration updated:[/bold] {file_path}\n"
+        f"[bold]Fields added:[/bold] {len(fields)}\n\n"
+        f"[bold]Next steps:[/bold]\n"
+        f"  1. Run: brickend generate\n"
+        f"  2. Review the generated code\n"
+        f"  3. Run: brickend validate",
+        title="🎉 Success",
+        border_style="green"
+    ))

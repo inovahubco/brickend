@@ -1,0 +1,34 @@
+name: aws_cdk
+category: infra
+description: "AWS Cloud Development Kit - Infrastructure as Code for AWS"
+version: "0.1.0"
+status: "planned"
+dependencies:
+  - aws-cdk-lib>=2.100.0
+  - constructs>=10.0.0
+  - boto3>=1.28.0
+author: "Brickend Team"
+maintainer: ""
+tags: ["aws", "cloud", "infrastructure", "cdk", "iac"]
+documentation_url: ""
+repository_url: ""
+license: "MIT"
+python_version: ">=3.11"
+supported_services:
+  - lambda
+  - api_gateway
+  - rds
+  - s3
+  - cloudwatch
+features:
+  - "Lambda functions deployment"
+  - "API Gateway integration"
+  - "RDS database setup"
+  - "S3 storage buckets"
+  - "CloudWatch monitoring"
+components:
+  - stack
+  - database
+  - api
+  - storage
+  - monitoring
