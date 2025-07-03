@@ -1,8 +1,8 @@
 """
 template_registry.py
 
-Scans integration directories for Jinja2 templates and provides lookup by integration key.
-Enhanced with plugin discovery and triplet indexing support.
+Scans integration directories for Jinja2 templates and provides lookup with triplet indexing support.
+Uses plugin discovery with structured integrations containing categories and meta.yaml files.
 """
 
 from pathlib import Path
@@ -11,72 +11,31 @@ from typing import Dict, List, Tuple
 
 class TemplateRegistry:
     """
-    TemplateRegistry scans given integration directories and builds a mapping
-    from integration name to a list of template file paths (.j2).
+    TemplateRegistry scans integration directories and builds a mapping
+    from triplet (category, stack, component) to template file paths (.j2).
 
-    Supports both legacy mode (direct integration directories) and new plugin mode
-    (structured integrations with categories and meta.yaml files).
+    Uses structured integrations with categories and meta.yaml files.
     """
 
-    def __init__(self, base_dirs: List[Path] = None, base_path: Path = None, ignore_hidden: bool = True) -> None:
+    def __init__(self, base_path: Path, ignore_hidden: bool = True) -> None:
         """
         Initialize the TemplateRegistry.
 
         Args:
-            base_dirs (List[Path], optional): LEGACY mode - Directories where each
-                directory's name represents the integration key. For backward compatibility.
-            base_path (Path, optional): NEW mode - Base path containing integrations/
-                directory with category/stack structure.
-            ignore_hidden (bool): If True, skip files or folders whose names start
-                with a dot ('.'). Defaults to True.
+            base_path: Base path containing integrations/ directory with category/stack structure.
+            ignore_hidden: If True, skip files or folders whose names start with a dot ('.').
         """
-        # Legacy mode attributes
-        self.templates: Dict[str, List[Path]] = {}
-        self.ignore_hidden = ignore_hidden
-
-        # New plugin mode attributes
         self.base_path = base_path
+        self.ignore_hidden = ignore_hidden
         self._index: Dict[Tuple[str, str, str], Path] = {}
         self._integrations: Dict[str, List[str]] = {}
 
-        # Initialize based on mode
-        if base_dirs is not None:
-            # LEGACY MODE: Initialize with list of integration directories
-            self._init_legacy_mode(base_dirs)
-        elif base_path is not None:
-            # NEW MODE: Initialize with plugin discovery
-            self._init_plugin_mode(base_path)
-        else:
-            raise ValueError("Either base_dirs (legacy) or base_path (plugin mode) must be provided")
-
-    def _init_legacy_mode(self, base_dirs: List[Path]) -> None:
-        """Initialize registry in legacy mode for backward compatibility."""
-        for base_dir in base_dirs:
-            if not base_dir.is_dir():
-                continue
-
-            integration_name = base_dir.name
-            collected: List[Path] = []
-
-            for file_path in base_dir.rglob("*.j2"):
-                if self.ignore_hidden:
-                    relative_parts = file_path.relative_to(base_dir).parts
-                    if any(part.startswith(".") for part in relative_parts):
-                        continue
-
-                collected.append(file_path)
-
-            if collected:
-                self.templates[integration_name] = collected
-
-    def _init_plugin_mode(self, base_path: Path) -> None:
-        """Initialize registry in new plugin mode with discovery."""
-        self.base_path = base_path
+        # Initialize with plugin discovery
         self._integrations = self.discover_integrations(base_path)
         self._discover_templates()
 
     # =============================================================================
-    # LEGACY INTERFACE (maintain backward compatibility)
+    # MAIN INTERFACE
     # =============================================================================
 
     def list_integrations(self) -> List[str]:
@@ -86,22 +45,17 @@ class TemplateRegistry:
         Returns:
             List[str]: Integration names, e.g., ["fastapi", "django", "aws_cdk"].
         """
-        if self.base_path is not None:
-            # NEW MODE: Return all stacks from all categories
-            all_stacks = []
-            for stacks in self._integrations.values():
-                all_stacks.extend(stacks)
-            return sorted(all_stacks)
-        else:
-            # LEGACY MODE
-            return sorted(self.templates.keys())
+        all_stacks = []
+        for stacks in self._integrations.values():
+            all_stacks.extend(stacks)
+        return sorted(set(all_stacks))
 
     def get_template_paths(self, integration: str) -> List[Path]:
         """
         Return all template file paths for a given integration.
 
         Args:
-            integration (str): The integration name (key) to query.
+            integration: The integration name (key) to query.
 
         Returns:
             List[Path]: Paths to .j2 template files.
@@ -109,31 +63,24 @@ class TemplateRegistry:
         Raises:
             KeyError: If the integration key is not registered.
         """
-        if self.base_path is not None:
-            # NEW MODE: Find templates for this stack across all categories
-            templates = []
-            for category, stacks in self._integrations.items():
-                if integration in stacks:
-                    stack_path = self.base_path / "integrations" / category / integration
+        templates = []
+        for category, stacks in self._integrations.items():
+            if integration in stacks:
+                stack_path = self.base_path / "integrations" / category / integration
+                if stack_path.exists():
                     templates.extend(list(stack_path.glob("*_template.j2")))
 
-            if not templates:
-                raise KeyError(f"No templates registered for integration '{integration}'")
-            return templates
-        else:
-            # LEGACY MODE
-            if integration not in self.templates:
-                raise KeyError(f"No templates registered for integration '{integration}'")
-            return self.templates[integration]
+        if not templates:
+            raise KeyError(f"No templates registered for integration '{integration}'")
+        return templates
 
     def find_template(self, integration: str, template_name: str) -> Path:
         """
         Find a specific template by filename within a given integration.
 
         Args:
-            integration (str): The integration name (key) to search in.
-            template_name (str): Exact filename of the template
-                (e.g., "models_template.j2").
+            integration: The integration name (key) to search in.
+            template_name: Exact filename of the template (e.g., "models_template.j2").
 
         Returns:
             Path: Full path to the matching template file.
@@ -151,7 +98,7 @@ class TemplateRegistry:
         raise FileNotFoundError(f"Template '{template_name}' not found under integration '{integration}'")
 
     # =============================================================================
-    # NEW PLUGIN INTERFACE
+    # TRIPLET INTERFACE
     # =============================================================================
 
     def get_template(self, category: str, stack: str, component: str) -> Path:
@@ -159,9 +106,9 @@ class TemplateRegistry:
         Get template by triplet (category, stack, component).
 
         Args:
-            category (str): Category name (e.g., "back", "infra")
-            stack (str): Stack name (e.g., "fastapi", "django")
-            component (str): Component name (e.g., "models", "schemas")
+            category: Category name (e.g., "back", "infra")
+            stack: Stack name (e.g., "fastapi", "django")
+            component: Component name (e.g., "models", "schemas")
 
         Returns:
             Path: Full path to the template file
@@ -172,9 +119,6 @@ class TemplateRegistry:
         Example:
             get_template("back", "fastapi", "models") -> Path to models_template.j2
         """
-        if self.base_path is None:
-            raise RuntimeError("get_template() requires plugin mode initialization with base_path")
-
         key = (category, stack, component)
         if key not in self._index:
             raise KeyError(f"Template not found: {category}/{stack}/{component}")
@@ -185,14 +129,11 @@ class TemplateRegistry:
         Get all available stacks for a given category.
 
         Args:
-            category (str): Category name (e.g., "back", "infra")
+            category: Category name (e.g., "back", "infra")
 
         Returns:
             List[str]: List of stack names
         """
-        if self.base_path is None:
-            raise RuntimeError("get_available_stacks() requires plugin mode initialization")
-
         return self._integrations.get(category, [])
 
     def get_available_components(self, category: str, stack: str) -> List[str]:
@@ -200,20 +141,63 @@ class TemplateRegistry:
         Get all available components for a given category/stack.
 
         Args:
-            category (str): Category name
-            stack (str): Stack name
+            category: Category name
+            stack: Stack name
 
         Returns:
             List[str]: List of component names
         """
-        if self.base_path is None:
-            raise RuntimeError("get_available_components() requires plugin mode initialization")
-
         components = []
         for (cat, stk, comp), _ in self._index.items():
             if cat == category and stk == stack:
                 components.append(comp)
         return sorted(components)
+
+    def get_all_categories(self) -> List[str]:
+        """
+        Get all available categories.
+
+        Returns:
+            List[str]: List of category names
+        """
+        return sorted(self._integrations.keys())
+
+    def get_template_info(self, category: str, stack: str, component: str) -> Dict[str, any]:
+        """
+        Get detailed information about a template.
+
+        Args:
+            category: Category name
+            stack: Stack name
+            component: Component name
+
+        Returns:
+            Dict with template information including path, existence, etc.
+        """
+        key = (category, stack, component)
+        if key in self._index:
+            template_path = self._index[key]
+            return {
+                'path': template_path,
+                'exists': template_path.exists(),
+                'category': category,
+                'stack': stack,
+                'component': component,
+                'filename': template_path.name
+            }
+        else:
+            return {
+                'path': None,
+                'exists': False,
+                'category': category,
+                'stack': stack,
+                'component': component,
+                'filename': None
+            }
+
+    # =============================================================================
+    # INTERNAL METHODS
+    # =============================================================================
 
     def _discover_templates(self) -> None:
         """Index all templates by triplet (category, stack, component)."""
@@ -227,6 +211,9 @@ class TemplateRegistry:
 
                 # Index all template files
                 for template_file in stack_path.glob("*_template.j2"):
+                    if self.ignore_hidden and template_file.name.startswith('.'):
+                        continue
+
                     component = template_file.stem.replace("_template", "")
                     key = (category, stack, component)
                     self._index[key] = template_file
@@ -250,7 +237,7 @@ class TemplateRegistry:
                     └── meta.yaml
 
         Args:
-            base_path (Path): Base path containing integrations/ directory
+            base_path: Base path containing integrations/ directory
 
         Returns:
             Dict[str, List[str]]: Mapping of category -> list of stack names

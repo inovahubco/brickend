@@ -3,13 +3,11 @@ test_template_registry.py
 
 Unit tests for TemplateRegistry in brickend_core.engine.template_registry.
 Covers:
-  - LEGACY MODE: Successful discovery of templates for multiple integrations.
-  - LEGACY MODE: list_integrations, get_template_paths, find_template methods.
-  - LEGACY MODE: Error handling for unknown integrations and missing templates.
-  - PLUGIN MODE: discover_integrations static method functionality.
-  - PLUGIN MODE: Triplet indexing (category, stack, component).
-  - PLUGIN MODE: get_template, get_available_stacks, get_available_components.
-  - PLUGIN MODE: meta.yaml requirement validation.
+  - Plugin discovery and initialization
+  - Triplet indexing (category, stack, component)
+  - Template access methods
+  - Error handling
+  - Integration workflows
 """
 
 import pytest
@@ -23,41 +21,9 @@ from brickend_core.engine import TemplateRegistry
 # =============================================================================
 
 @pytest.fixture
-def sample_integration_dirs(tmp_path):
-    """
-    Create a temporary directory structure simulating integration template directories.
-    FOR LEGACY MODE testing.
-
-    Structure:
-      tmp_path/integrations/back/fastapi/models_template.j2
-      tmp_path/integrations/back/fastapi/router_template.j2
-      tmp_path/integrations/back/django/serializer_template.j2
-
-    Args:
-        tmp_path (Path): pytest-provided temporary directory.
-
-    Returns:
-        List[Path]: List of base integration directories for TemplateRegistry.
-    """
-    base = tmp_path / "integrations" / "back"
-    fastapi_dir = base / "fastapi"
-    django_dir = base / "django"
-
-    fastapi_dir.mkdir(parents=True, exist_ok=True)
-    django_dir.mkdir(parents=True, exist_ok=True)
-
-    (fastapi_dir / "models_template.j2").write_text("dummy content", encoding="utf-8")
-    (fastapi_dir / "router_template.j2").write_text("dummy content", encoding="utf-8")
-    (django_dir / "serializer_template.j2").write_text("dummy content", encoding="utf-8")
-
-    return [fastapi_dir, django_dir]
-
-
-@pytest.fixture
 def plugin_structure_with_meta(tmp_path):
     """
     Create a complete plugin-style directory structure with meta.yaml files.
-    FOR PLUGIN MODE testing.
 
     Structure:
       tmp_path/integrations/
@@ -180,76 +146,7 @@ def plugin_structure_no_meta(tmp_path):
 
 
 # =============================================================================
-# LEGACY MODE TESTS(maintain existing functionality)
-# =============================================================================
-
-def test_list_integrations_and_get_paths(sample_integration_dirs):
-    """
-    Verify that TemplateRegistry correctly discovers and lists integrations,
-    and returns the expected template paths for each integration.
-
-    Args:
-        sample_integration_dirs (List[Path]): Directories simulating integrations.
-    """
-    registry = TemplateRegistry(sample_integration_dirs)
-
-    integrations = registry.list_integrations()
-    assert "fastapi" in integrations
-    assert "django" in integrations
-    assert len(integrations) == 2
-
-    fastapi_paths = registry.get_template_paths("fastapi")
-    names = sorted([p.name for p in fastapi_paths])
-    assert names == ["models_template.j2", "router_template.j2"]
-
-    django_paths = registry.get_template_paths("django")
-    assert len(django_paths) == 1
-    assert django_paths[0].name == "serializer_template.j2"
-
-
-def test_find_existing_template(sample_integration_dirs):
-    """
-    Verify that find_template returns the correct Path object for an existing template file.
-
-    Args:
-        sample_integration_dirs (List[Path]): Directories simulating integrations.
-    """
-    registry = TemplateRegistry(sample_integration_dirs)
-    path = registry.find_template("fastapi", "models_template.j2")
-    assert path.name == "models_template.j2"
-    assert path.exists()
-    assert path.parent.name == "fastapi"
-
-
-def test_get_template_paths_unknown_integration(sample_integration_dirs):
-    """
-    Verify that get_template_paths raises KeyError when querying a non-registered integration.
-
-    Args:
-        sample_integration_dirs (List[Path]): Directories simulating integrations.
-    """
-    registry = TemplateRegistry(sample_integration_dirs)
-    with pytest.raises(KeyError) as exc_info:
-        registry.get_template_paths("nonexistent")
-    assert "No templates registered for integration 'nonexistent'" in str(exc_info.value)
-
-
-def test_find_template_not_found(sample_integration_dirs):
-    """
-    Verify that find_template raises FileNotFoundError when the template name does not exist
-    under a registered integration.
-
-    Args:
-        sample_integration_dirs (List[Path]): Directories simulating integrations.
-    """
-    registry = TemplateRegistry(sample_integration_dirs)
-    with pytest.raises(FileNotFoundError) as exc_info:
-        registry.find_template("fastapi", "does_not_exist.j2")
-    assert "Template 'does_not_exist.j2' not found under integration 'fastapi'" in str(exc_info.value)
-
-
-# =============================================================================
-# PLUGIN MODE TESTS(new functionality)
+# PLUGIN DISCOVERY TESTS
 # =============================================================================
 
 class TestPluginDiscovery:
@@ -286,8 +183,16 @@ class TestPluginDiscovery:
 
         assert result == {}
 
-    def test_plugin_mode_initialization(self, plugin_structure_with_meta):
-        """Test initialization in plugin mode with base_path."""
+
+# =============================================================================
+# TEMPLATE REGISTRY TESTS
+# =============================================================================
+
+class TestTemplateRegistry:
+    """Test suite for TemplateRegistry core functionality."""
+
+    def test_initialization(self, plugin_structure_with_meta):
+        """Test initialization with base_path."""
         base_path = plugin_structure_with_meta
 
         registry = TemplateRegistry(base_path=base_path)
@@ -366,25 +271,12 @@ class TestPluginDiscovery:
         aws_components = registry.get_available_components("infra", "aws_cdk")
         assert aws_components == ["stack"]
 
-    def test_legacy_compatibility_in_plugin_mode(self, plugin_structure_with_meta):
-        """Test that legacy methods work in plugin mode."""
-        base_path = plugin_structure_with_meta
-        registry = TemplateRegistry(base_path=base_path)
+        # Test non-existent category/stack
+        empty_components = registry.get_available_components("nonexistent", "fastapi")
+        assert empty_components == []
 
-        # Legacy methods should work
-        integrations = registry.list_integrations()
-        assert "fastapi" in integrations
-        assert "django" in integrations
-        assert "aws_cdk" in integrations
-        assert "terraform" in integrations
-
-        # get_template_paths should work for any stack
-        fastapi_paths = registry.get_template_paths("fastapi")
-        assert len(fastapi_paths) == 3  # models, schemas, router
-
-        # find_template should work
-        path = registry.find_template("fastapi", "models_template.j2")
-        assert path.exists()
+        empty_components2 = registry.get_available_components("back", "nonexistent")
+        assert empty_components2 == []
 
 
 # =============================================================================
@@ -392,29 +284,26 @@ class TestPluginDiscovery:
 # =============================================================================
 
 class TestErrorHandling:
-    """Test error handling in both modes."""
+    """Test error handling."""
 
     def test_invalid_initialization(self):
-        """Test that invalid initialization raises ValueError."""
-        with pytest.raises(ValueError) as exc_info:
-            TemplateRegistry()  # Neither base_dirs nor base_path provided
-        assert "Either base_dirs (legacy) or base_path (plugin mode) must be provided" in str(exc_info.value)
+        """Test that initializing without base_path raises TypeError."""
+        with pytest.raises(TypeError):
+            TemplateRegistry()
 
-    def test_plugin_methods_require_plugin_mode(self, sample_integration_dirs):
-        """Test that plugin methods raise RuntimeError in legacy mode."""
-        registry = TemplateRegistry(sample_integration_dirs)  # Legacy mode
+    def test_invalid_base_path_type(self):
+        """Test that invalid base_path type raises TypeError."""
+        with pytest.raises(TypeError):
+            TemplateRegistry(base_path="string_instead_of_path")
 
-        with pytest.raises(RuntimeError) as exc_info:
-            registry.get_template("back", "fastapi", "models")
-        assert "requires plugin mode initialization" in str(exc_info.value)
+    def test_nonexistent_base_path(self, tmp_path):
+        """Test initialization with non-existent base_path."""
+        nonexistent_path = tmp_path / "does_not_exist"
 
-        with pytest.raises(RuntimeError) as exc_info:
-            registry.get_available_stacks("back")
-        assert "requires plugin mode initialization" in str(exc_info.value)
-
-        with pytest.raises(RuntimeError) as exc_info:
-            registry.get_available_components("back", "fastapi")
-        assert "requires plugin mode initialization" in str(exc_info.value)
+        # Should not raise error during init, but will have empty integrations
+        registry = TemplateRegistry(base_path=nonexistent_path)
+        assert registry._integrations == {}
+        assert registry._index == {}
 
 
 # =============================================================================
@@ -435,17 +324,9 @@ class TestIntegration:
         # 2. Registry initialization
         registry = TemplateRegistry(base_path=base_path)
 
-        # 3. Template access via different methods
-        # Via triplet
+        # 3. Template access via triplet
         template_path = registry.get_template("back", "fastapi", "models")
         assert template_path.exists()
-
-        # Via legacy methods
-        fastapi_templates = registry.get_template_paths("fastapi")
-        assert len(fastapi_templates) == 3
-
-        found_template = registry.find_template("fastapi", "models_template.j2")
-        assert found_template == template_path
 
         # 4. Available stacks and components
         back_stacks = registry.get_available_stacks("back")
@@ -453,3 +334,27 @@ class TestIntegration:
 
         fastapi_components = registry.get_available_components("back", "fastapi")
         assert "models" in fastapi_components
+
+    def test_complete_stack_enumeration(self, plugin_structure_with_meta):
+        """Test complete enumeration of all available stacks and components."""
+        base_path = plugin_structure_with_meta
+        registry = TemplateRegistry(base_path=base_path)
+
+        # Enumerate all categories
+        all_integrations = registry._integrations
+        assert set(all_integrations.keys()) == {"back", "infra"}
+
+        # Verify all stacks are discoverable
+        for category, stacks in all_integrations.items():
+            available_stacks = registry.get_available_stacks(category)
+            assert sorted(available_stacks) == sorted(stacks)
+
+            # Verify all components for each stack
+            for stack in stacks:
+                components = registry.get_available_components(category, stack)
+                assert len(components) > 0  # Each stack should have at least one component
+
+                # Verify each component is accessible
+                for component in components:
+                    template_path = registry.get_template(category, stack, component)
+                    assert template_path.exists()

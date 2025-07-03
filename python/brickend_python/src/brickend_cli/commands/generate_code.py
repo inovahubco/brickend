@@ -188,47 +188,20 @@ def generate_with_progress(generator: CodeGenerator, config: BrickendProject, ou
 
 @app.command("code")
 def generate_code(
-    config_path: Optional[Path] = typer.Option(
-        None, "--config", "-c", help="Path to brickend.yaml (default: auto-detect)"
-    ),
-    output_dir: Optional[Path] = typer.Option(
-        None, "--output", "-o", help="Directory where generated code will be written (default: current directory)"
-    ),
-    # Legacy parameters for backward compatibility
-    entities_path: Optional[Path] = typer.Option(
-        None, "--entities", help="[LEGACY] Path to entities.yaml file"
-    ),
-    integration: Optional[str] = typer.Option(
-        None, "--integration", "-i", help="[LEGACY] Integration key (use brickend.yaml instead)"
-    ),
-    database_url: Optional[str] = typer.Option(
-        None, "--db-url", help="Database URL override"
-    ),
-    validate_only: bool = typer.Option(
-        False, "--validate-only", help="Only validate configuration without generating code"
-    ),
+        config_path: Optional[Path] = typer.Option(
+            None, "--config", "-c", help="Path to brickend.yaml (default: auto-detect)"
+        ),
+        output_dir: Optional[Path] = typer.Option(
+            None, "--output", "-o", help="Directory where generated code will be written (default: current directory)"
+        ),
+        database_url: Optional[str] = typer.Option(
+            None, "--db-url", help="Database URL override"
+        ),
+        validate_only: bool = typer.Option(
+            False, "--validate-only", help="Only validate configuration without generating code"
+        ),
 ) -> None:
-    """Generate code based on project configuration.
-
-    NEW USAGE (recommended):
-      brickend generate
-      brickend generate --output ./generated
-
-    LEGACY USAGE (backward compatibility):
-      brickend generate --entities entities.yaml --integration fastapi --output ./app
-
-    The command automatically detects your project configuration from brickend.yaml
-    or falls back to entities.yaml. Generated code structure depends on the
-    configured stack (FastAPI, Django, etc.).
-
-    Args:
-        config_path: Path to brickend.yaml (auto-detected if not provided)
-        output_dir: Directory where generated code will be written
-        entities_path: [LEGACY] Path to entities.yaml file
-        integration: [LEGACY] Integration key
-        database_url: Database URL override
-        validate_only: Only validate configuration without generating
-    """
+    """Generate code based on project configuration."""
 
     console.print(Panel(
         "[bold blue]Brickend Code Generator[/bold blue]\n"
@@ -237,65 +210,24 @@ def generate_code(
         border_style="blue"
     ))
 
-    # Determine operation mode: hybrid config or legacy
-    use_legacy_mode = entities_path is not None or integration is not None
+    try:
+        config = load_project_config(config_path or Path("brickend.yaml"))
+    except FileNotFoundError as e:
+        console.print(f"[red]Error: {e}[/red]")
+        console.print("[yellow]Hint: Run 'brickend init' to create a new project[/yellow]")
+        raise typer.Exit(code=1)
+    except ValueError as e:
+        console.print(f"[red]Configuration error: {e}[/red]")
+        raise typer.Exit(code=1)
 
-    if use_legacy_mode:
-        console.print("[yellow]Using legacy mode (consider migrating to brickend.yaml)[/yellow]")
-
-        # Legacy mode validation
-        if not entities_path:
-            entities_path = Path("entities.yaml")
-        if not integration:
-            integration = "fastapi"
-        if not output_dir:
-            output_dir = Path("./app")
-
-        try:
-            # Load entities using legacy method
-            raw_entities = load_entities(entities_path)
-
-            # Create minimal config for compatibility
-            from brickend_core.config.project_schema import ProjectInfo, StackConfig
-            config = BrickendProject(
-                project=ProjectInfo(name="legacy_project"),
-                stack=StackConfig(back=integration),
-                entities=raw_entities["entities"]
-            )
-
-        except FileNotFoundError as e:
-            console.print(f"[red]Error: {e}[/red]")
-            raise typer.Exit(code=1)
-        except ValueError as e:
-            console.print(f"[red]Error: {e}[/red]")
-            raise typer.Exit(code=1)
-
-    else:
-        # Modern hybrid configuration mode
-        try:
-            config = load_project_config(config_path or Path("brickend.yaml"))
-
-        except FileNotFoundError as e:
-            console.print(f"[red]Error: {e}[/red]")
-            console.print("[yellow]Hint: Run 'brickend init' to create a new project[/yellow]")
-            raise typer.Exit(code=1)
-        except ValueError as e:
-            console.print(f"[red]Configuration error: {e}[/red]")
-            raise typer.Exit(code=1)
-
-    # Set default output directory based on stack
+    # Set default output directory
     if not output_dir:
-        if config.stack.back == "django":
-            output_dir = Path(".")  # Django generates in current directory
-        else:
-            output_dir = Path(".")  # FastAPI and others too
+        output_dir = Path(".")
 
     # Override database URL if provided
     if database_url:
-        if not hasattr(config.settings, 'database_url'):
-            config.settings.database_url = database_url
-        else:
-            config.settings.database_url = database_url
+        config = config.model_copy(deep=True)
+        config.settings.database_url = database_url
 
     # Display configuration info
     info_table = Table(title="Project Configuration")
@@ -338,37 +270,58 @@ def generate_code(
         # Use new template registry with plugin discovery
         template_registry = TemplateRegistry(base_path=base_path)
 
-        # Initialize context builder
-        context_builder = ContextBuilder()
-
         # Create output directory
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Create CodeGenerator (need to update this to use new interface)
-        generator = CodeGenerator(template_engine, template_registry, output_dir)
-        generator.context_builder = context_builder  # Add context builder
+        # Create CodeGenerator with config
+        generator = CodeGenerator(
+            template_engine=template_engine,
+            template_registry=template_registry,
+            output_dir=output_dir,
+            preserve_protected_regions=True,
+            config=config  # ✅ Pasar la configuración
+        )
 
-    except Exception as e:
-        console.print(f"[red]Setup error: {e}[/red]")
-        raise typer.Exit(code=1)
+        # Use the generate_all method that handles per-entity generation
+        with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                console=console,
+        ) as progress:
+            task = progress.add_task(f"Generating {config.stack.back} code...", total=None)
 
-    try:
-        # Generate code with progress
-        generated_files = generate_with_progress(generator, config, output_dir)
+            generator.generate_all()  # ✅ Usar el método correcto
 
-        if not generated_files:
-            console.print("[yellow]Warning: No files were generated[/yellow]")
-            raise typer.Exit(code=1)
+            progress.update(task, completed=True)
+
+        # Count generated files
+        generated_files = []
+        app_dir = output_dir / "app"
+        if app_dir.exists():
+            # Single files
+            for file in ["models.py", "schemas.py", "main.py", "database.py"]:
+                if (app_dir / file).exists():
+                    generated_files.append((file.replace(".py", ""), app_dir / file))
+
+            # Per-entity files
+            if (app_dir / "crud").exists():
+                for crud_file in (app_dir / "crud").glob("*_crud.py"):
+                    generated_files.append((f"crud/{crud_file.name}", crud_file))
+
+            if (app_dir / "routers").exists():
+                for router_file in (app_dir / "routers").glob("*_router.py"):
+                    generated_files.append((f"routers/{router_file.name}", router_file))
 
         # Success summary
-        success_table = Table(title="Generated Files")
-        success_table.add_column("Component", style="cyan")
-        success_table.add_column("File Path", style="green")
+        if generated_files:
+            success_table = Table(title="Generated Files")
+            success_table.add_column("Component", style="cyan")
+            success_table.add_column("File Path", style="green")
 
-        for component, file_path in generated_files.items():
-            success_table.add_row(component, str(file_path))
+            for component, file_path in generated_files:
+                success_table.add_row(component, str(file_path))
 
-        console.print(success_table)
+            console.print(success_table)
 
         console.print(Panel(
             f"[bold green]✅ Code generated successfully![/bold green]\n\n"
@@ -385,4 +338,6 @@ def generate_code(
 
     except Exception as e:
         console.print(f"[red]Generation error: {e}[/red]")
+        import traceback
+        traceback.print_exc()
         raise typer.Exit(code=1)

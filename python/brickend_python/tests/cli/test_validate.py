@@ -119,32 +119,6 @@ def invalid_brickend_project(tmp_path):
 
 
 @pytest.fixture
-def legacy_project(tmp_path):
-    """Create a legacy project structure (entities.yaml only)."""
-    project_dir = tmp_path / "legacy_project"
-    project_dir.mkdir()
-
-    # Only entities.yaml, no brickend.yaml
-    entities_config = {
-        "entities": [
-            {
-                "name": "LegacyEntity",
-                "fields": [
-                    {"name": "id", "type": "uuid", "primary_key": True},
-                    {"name": "name", "type": "string"}
-                ]
-            }
-        ]
-    }
-
-    yaml = ruamel.yaml.YAML()
-    with (project_dir / "entities.yaml").open("w", encoding="utf-8") as f:
-        yaml.dump(entities_config, f)
-
-    return project_dir
-
-
-@pytest.fixture
 def project_with_entity_errors(tmp_path):
     """Create a project with entity validation errors."""
     project_dir = tmp_path / "entity_errors_project"
@@ -352,24 +326,6 @@ class TestValidateCommand:
 
             assert result.exit_code == 1
             assert "error" in result.stdout.lower() or "❌" in result.stdout
-
-    def test_validate_legacy_project(self, legacy_project, mock_template_system):
-        """Test validation of legacy project (entities.yaml only)."""
-        runner = CliRunner()
-        mock_registry, mock_engine = mock_template_system()
-
-        with patch('brickend_cli.commands.validate.find_project_root') as mock_find_root, \
-                patch('brickend_cli.commands.validate.TemplateRegistry') as mock_registry_class, \
-                patch('brickend_cli.commands.validate.TemplateEngine') as mock_engine_class:
-
-            mock_find_root.return_value = Path("/mock/project/root")
-            mock_registry_class.return_value = mock_registry
-            mock_engine_class.return_value = mock_engine
-
-            result = run_validate_in_directory(legacy_project, runner=runner)
-
-            assert result.exit_code == 0
-            assert "successful" in result.stdout.lower() or "passed" in result.stdout.lower()
 
 
 # =============================================================================

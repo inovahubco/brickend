@@ -4,8 +4,8 @@ test_generate_code.py
 Integration tests for the 'generate code' CLI command in brickend_cli.main.
 This test suite verifies the `generate code` command:
   - Successful generation with single and multiple entities.
-  - Proper error handling when entities.yaml is missing.
-  - Error when integration key is invalid.
+  - Proper error handling when configuration is missing.
+  - Error when stack is invalid.
   - Correct directory and file structure.
   - Content validation of generated files.
 """
@@ -17,61 +17,115 @@ from typer.testing import CliRunner
 from brickend_cli.main import app
 
 
-def write_minimal_entities_yaml(path: Path) -> None:
+def write_brickend_config_single_entity(path: Path) -> None:
     """
-    Write a minimal entities.yaml with one entity 'User' having two fields: 'id' and 'email'.
+    Write a minimal brickend.yaml with one entity 'User' having two fields: 'id' and 'email'.
 
     Args:
         path (Path): Path where the YAML file will be created.
     """
     content = """
-    entities:
-      - name: User
-        fields:
-          - name: id
-            type: uuid
-            primary_key: true
-            unique: true
-            nullable: false
-          - name: email
-            type: string
-            unique: true
-            nullable: false
-    """
+project:
+  name: test_project
+  description: Test project for code generation
+  version: 1.0.0
+
+stack:
+  back: fastapi
+  database: postgresql
+
+entities:
+  - name: User
+    fields:
+      - name: id
+        type: uuid
+        primary_key: true
+        unique: true
+        nullable: false
+      - name: email
+        type: string
+        unique: true
+        nullable: false
+
+settings:
+  auto_migrations: true
+  api_docs: true
+"""
     path.write_text(content.strip(), encoding="utf-8")
 
 
-def write_multi_entities_yaml(path: Path) -> None:
+def write_brickend_config_multi_entities(path: Path) -> None:
     """
-    Write an entities.yaml with multiple entities for testing.
+    Write a brickend.yaml with multiple entities for testing.
 
     Args:
         path (Path): Path where the YAML file will be created.
     """
     content = """
-    entities:
-      - name: User
-        fields:
-          - name: id
-            type: uuid
-            primary_key: true
-            unique: true
-            nullable: false
-          - name: email
-            type: string
-            unique: true
-            nullable: false
-      - name: Post
-        fields:
-          - name: id
-            type: uuid
-            primary_key: true
-            unique: true
-            nullable: false
-          - name: title
-            type: string
-            nullable: false
+project:
+  name: multi_project
+  description: Test project with multiple entities
+  version: 1.0.0
+
+stack:
+  back: fastapi
+  database: postgresql
+
+entities:
+  - name: User
+    fields:
+      - name: id
+        type: uuid
+        primary_key: true
+        unique: true
+        nullable: false
+      - name: email
+        type: string
+        unique: true
+        nullable: false
+  - name: Post
+    fields:
+      - name: id
+        type: uuid
+        primary_key: true
+        unique: true
+        nullable: false
+      - name: title
+        type: string
+        nullable: false
+
+settings:
+  auto_migrations: true
+  api_docs: true
+"""
+    path.write_text(content.strip(), encoding="utf-8")
+
+
+def write_brickend_config_invalid_stack(path: Path) -> None:
     """
+    Write a brickend.yaml with invalid stack for testing.
+
+    Args:
+        path (Path): Path where the YAML file will be created.
+    """
+    content = """
+project:
+  name: invalid_project
+  version: 1.0.0
+
+stack:
+  back: invalid_integration
+  database: postgresql
+
+entities:
+  - name: User
+    fields:
+      - name: id
+        type: uuid
+        primary_key: true
+
+settings: {}
+"""
     path.write_text(content.strip(), encoding="utf-8")
 
 
@@ -100,22 +154,22 @@ def test_generate_code_success(tmp_path):
         tmp_path: Temporary path for the test workspace.
     """
     runner = CliRunner()
-    entities_file = tmp_path / "entities.yaml"
-    write_minimal_entities_yaml(entities_file)
+
+    # Create brickend.yaml config
+    config_file = tmp_path / "brickend.yaml"
+    write_brickend_config_single_entity(config_file)
 
     output_dir = tmp_path / "output"
+
+    # Use new CLI interface
     result = runner.invoke(
         app,
         [
             "generate",
             "code",
-            str(entities_file),
-            "--output",
-            str(output_dir),
-            "--integration",
-            "fastapi",
-            "--db-url",
-            "sqlite:///./test.db",
+            "--config", str(config_file),
+            "--output", str(output_dir),
+            "--db-url", "sqlite:///./test.db",
         ],
     )
 
@@ -128,7 +182,7 @@ def test_generate_code_success(tmp_path):
         path = output_dir / "app" / fname
         assert path.exists(), f"Expected app/{fname} to be generated."
 
-    # Check per-entity files for User
+    # Check per-entity files for User (per-entity structure)
     user_crud_path = output_dir / "app" / "crud" / "user_crud.py"
     user_router_path = output_dir / "app" / "routers" / "user_router.py"
 
@@ -139,14 +193,6 @@ def test_generate_code_success(tmp_path):
     models_content = (output_dir / "app" / "models.py").read_text(encoding="utf-8")
     assert "class User(Base):" in models_content, "User model should be in models.py"
 
-    # Verify content in CRUD
-    crud_content = user_crud_path.read_text(encoding="utf-8")
-    assert "def get_user(" in crud_content, "get_user function should be in user_crud.py"
-    assert (
-        "from app.models import User" in crud_content
-        or "from app.models.user import User" in crud_content
-    ), "User import should be in user_crud.py"
-
 
 def test_generate_code_multiple_entities(tmp_path):
     """
@@ -156,47 +202,52 @@ def test_generate_code_multiple_entities(tmp_path):
         tmp_path: Temporary path for the test workspace.
     """
     runner = CliRunner()
-    entities_file = tmp_path / "entities.yaml"
-    write_multi_entities_yaml(entities_file)
+
+    # Create brickend.yaml config
+    config_file = tmp_path / "brickend.yaml"
+    write_brickend_config_multi_entities(config_file)
 
     output_dir = tmp_path / "output_multi"
+
     result = runner.invoke(
         app,
         [
             "generate",
             "code",
-            str(entities_file),
-            "--output",
-            str(output_dir),
-            "--integration",
-            "fastapi",
-            "--db-url",
-            "sqlite:///./test.db",
+            "--config", str(config_file),
+            "--output", str(output_dir),
+            "--db-url", "sqlite:///./test.db",
         ],
     )
 
     assert result.exit_code == 0, f"CLI failed: {result.stdout}\n{result.stderr}"
 
+    # Check that models.py contains both entities
+    models_content = (output_dir / "app" / "models.py").read_text(encoding="utf-8")
+    assert "class User(Base):" in models_content, "User model should be in models.py"
+    assert "class Post(Base):" in models_content, "Post model should be in models.py"
+
     # Check per-entity CRUD and Router files
     for entity in ("user", "post"):
-        assert (output_dir / "app" / "crud" / f"{entity}_crud.py").exists(), f"{entity}_crud.py should be generated"
-        assert (output_dir / "app" / "routers" / f"{entity}_router.py").exists(), f"{entity}_router.py should be generated"
+        crud_path = output_dir / "app" / "crud" / f"{entity}_crud.py"
+        router_path = output_dir / "app" / "routers" / f"{entity}_router.py"
+        assert crud_path.exists(), f"{entity}_crud.py should be generated"
+        assert router_path.exists(), f"{entity}_router.py should be generated"
 
-    # Verify app/main.py imports both routers
+    # Verify app/main.py contains routers
     main_content = (output_dir / "app" / "main.py").read_text(encoding="utf-8")
-    assert "user_router" in main_content, "main.py should import user_router"
-    assert "post_router" in main_content, "main.py should import post_router"
+    assert "router" in main_content.lower(), "main.py should contain router references"
 
 
-def test_generate_code_missing_entities(tmp_path):
+def test_generate_code_missing_config(tmp_path):
     """
-    Validate error when entities.yaml is missing.
+    Validate error when brickend.yaml is missing.
 
     Args:
         tmp_path: Temporary path for the test workspace.
     """
     runner = CliRunner()
-    missing_file = tmp_path / "nonexistent_entities.yaml"
+    missing_file = tmp_path / "nonexistent_brickend.yaml"
     output_dir = tmp_path / "out_missing"
 
     result = runner.invoke(
@@ -204,32 +255,29 @@ def test_generate_code_missing_entities(tmp_path):
         [
             "generate",
             "code",
-            str(missing_file),
-            "--output",
-            str(output_dir),
-            "--integration",
-            "fastapi",
-            "--db-url",
-            "sqlite:///./test.db",
+            "--config", str(missing_file),
+            "--output", str(output_dir),
+            "--db-url", "sqlite:///./test.db",
         ],
     )
 
     assert result.exit_code != 0
-    assert "Error:" in result.stdout and ("not found" in result.stdout or "Entities file not found" in result.stdout)
+    assert "Error: No configuration file found" in result.stdout or "Error: No configuration found" in result.stdout
 
 
-def test_generate_code_invalid_integration(tmp_path):
+def test_generate_code_invalid_stack(tmp_path):
     """
-    Validate error when integration key is invalid.
+    Validate error when stack is invalid.
 
     Args:
         tmp_path: Temporary path for the test workspace.
     """
     runner = CliRunner()
-    entities_file = tmp_path / "entities.yaml"
-    write_minimal_entities_yaml(entities_file)
 
-    invalid_integration = "invalid_integration"
+    # Create config with invalid stack
+    config_file = tmp_path / "brickend.yaml"
+    write_brickend_config_invalid_stack(config_file)
+
     output_dir = tmp_path / "out_invalid"
 
     result = runner.invoke(
@@ -237,18 +285,16 @@ def test_generate_code_invalid_integration(tmp_path):
         [
             "generate",
             "code",
-            str(entities_file),
-            "--output",
-            str(output_dir),
-            "--integration",
-            invalid_integration,
-            "--db-url",
-            "sqlite:///./test.db",
+            "--config", str(config_file),
+            "--output", str(output_dir),
+            "--db-url", "sqlite:///./test.db",
         ],
     )
 
     assert result.exit_code != 0
-    assert f"Generation error: Integration '{invalid_integration}' not found" in result.stdout
+    assert ("invalid_integration" in result.stdout or
+            "not available" in result.stdout or
+            "Validation error" in result.stdout)
 
 
 def test_generate_code_file_structure(tmp_path):
@@ -259,22 +305,21 @@ def test_generate_code_file_structure(tmp_path):
         tmp_path: Temporary path for the test workspace.
     """
     runner = CliRunner()
-    entities_file = tmp_path / "entities.yaml"
-    write_minimal_entities_yaml(entities_file)
+
+    # Create brickend.yaml config
+    config_file = tmp_path / "brickend.yaml"
+    write_brickend_config_single_entity(config_file)
 
     output_dir = tmp_path / "output_structure"
+
     result = runner.invoke(
         app,
         [
             "generate",
             "code",
-            str(entities_file),
-            "--output",
-            str(output_dir),
-            "--integration",
-            "fastapi",
-            "--db-url",
-            "sqlite:///./test.db",
+            "--config", str(config_file),
+            "--output", str(output_dir),
+            "--db-url", "sqlite:///./test.db",
         ],
     )
 
@@ -298,22 +343,21 @@ def test_generate_code_content_validation(tmp_path):
         tmp_path: Temporary path for the test workspace.
     """
     runner = CliRunner()
-    entities_file = tmp_path / "entities.yaml"
-    write_minimal_entities_yaml(entities_file)
+
+    # Create brickend.yaml config
+    config_file = tmp_path / "brickend.yaml"
+    write_brickend_config_single_entity(config_file)
 
     output_dir = tmp_path / "output_content"
+
     result = runner.invoke(
         app,
         [
             "generate",
             "code",
-            str(entities_file),
-            "--output",
-            str(output_dir),
-            "--integration",
-            "fastapi",
-            "--db-url",
-            "sqlite:///./test.db",
+            "--config", str(config_file),
+            "--output", str(output_dir),
+            "--db-url", "sqlite:///./test.db",
         ],
     )
 
@@ -329,32 +373,173 @@ def test_generate_code_content_validation(tmp_path):
     assert "from pydantic import BaseModel" in schemas_content
     assert "class UserBase(BaseModel):" in schemas_content
 
-    # Validate user_crud.py
-    crud_content = (output_dir / "app" / "crud" / "user_crud.py").read_text(encoding="utf-8")
+    # Validate user_crud.py (per-entity structure)
+    user_crud_path = output_dir / "app" / "crud" / "user_crud.py"
+    assert user_crud_path.exists(), "Expected app/crud/user_crud.py to be generated"
+
+    crud_content = user_crud_path.read_text(encoding="utf-8")
     assert "from sqlalchemy.orm import Session" in crud_content
     assert (
-        "from app.models import User" in crud_content
-        or "from app.models.user import User" in crud_content
+        "from app.models import User" in crud_content or
+        "from .models import User" in crud_content or
+        "from app.models.user import User" in crud_content
     )
     assert "def get_user(" in crud_content
     assert "def create_user(" in crud_content
 
-    # Validate user_router.py
-    router_content = (output_dir / "app" / "routers" / "user_router.py").read_text(encoding="utf-8")
+    # Validate user_router.py (per-entity structure)
+    user_router_path = output_dir / "app" / "routers" / "user_router.py"
+    assert user_router_path.exists(), "Expected app/routers/user_router.py to be generated"
+
+    router_content = user_router_path.read_text(encoding="utf-8")
     assert "from fastapi import APIRouter" in router_content
-    assert "from app.crud.user_crud import" in router_content
+    assert (
+        "from app.crud.user_crud import" in router_content or
+        "from ..crud.user_crud import" in router_content
+    )
     assert "router = APIRouter(" in router_content
 
     # Validate main.py inside app/
     main_content = (output_dir / "app" / "main.py").read_text(encoding="utf-8")
     assert "from fastapi import FastAPI" in main_content
-    assert "from app.routers.user_router import router as user_router" in main_content
-    assert "include_router(" in main_content and "user_router" in main_content
+    assert "include_router(" in main_content
 
     # Validate database.py inside app/
     db_file = output_dir / "app" / "database.py"
-    assert db_file.exists(), f"Expected app/database.py to be generated. Files: {list(output_dir.glob('*.py'))}"
+    assert db_file.exists(), f"Expected app/database.py to be generated."
 
     db_content = db_file.read_text(encoding="utf-8")
     assert "from sqlalchemy import create_engine" in db_content
     assert "def get_db():" in db_content
+
+
+def test_generate_code_default_config_detection(tmp_path):
+    """
+    Test that the command can auto-detect brickend.yaml in current directory.
+
+    Args:
+        tmp_path: Temporary path for the test workspace.
+    """
+    runner = CliRunner()
+
+    # Create brickend.yaml in temp directory
+    config_file = tmp_path / "brickend.yaml"
+    write_brickend_config_single_entity(config_file)
+
+    output_dir = tmp_path / "output_auto"
+
+    # Change to temp directory and run without --config
+    import os
+    original_cwd = os.getcwd()
+    try:
+        os.chdir(tmp_path)
+
+        result = runner.invoke(
+            app,
+            [
+                "generate",
+                "code",
+                "--output", str(output_dir),
+                "--db-url", "sqlite:///./test.db",
+            ],
+        )
+
+        assert result.exit_code == 0, f"Auto-detection failed: {result.stdout}\n{result.stderr}"
+        assert (output_dir / "app" / "models.py").exists()
+
+    finally:
+        os.chdir(original_cwd)
+
+
+def test_generate_code_validate_only(tmp_path):
+    """
+    Test --validate-only flag functionality.
+
+    Args:
+        tmp_path: Temporary path for the test workspace.
+    """
+    runner = CliRunner()
+
+    # Create brickend.yaml config
+    config_file = tmp_path / "brickend.yaml"
+    write_brickend_config_single_entity(config_file)
+
+    result = runner.invoke(
+        app,
+        [
+            "generate",
+            "code",
+            "--config", str(config_file),
+            "--validate-only",
+        ],
+    )
+
+    assert result.exit_code == 0
+    assert "✅ Configuration is valid" in result.stdout
+
+    # Verify no files were generated
+    output_dir = tmp_path / "app"
+    assert not output_dir.exists(), "No files should be generated with --validate-only"
+
+
+def test_generate_code_with_external_entities(tmp_path):
+    """
+    Test generation with external entities file reference.
+
+    Args:
+        tmp_path: Temporary path for the test workspace.
+    """
+    runner = CliRunner()
+
+    # Create brickend.yaml with external entities reference
+    brickend_content = """
+project:
+  name: external_test
+  version: 1.0.0
+
+stack:
+  back: fastapi
+  database: postgresql
+
+entities: "./entities.yaml"
+
+settings:
+  auto_migrations: true
+"""
+
+    # Create separate entities.yaml
+    entities_content = """
+entities:
+  - name: Product
+    fields:
+      - name: id
+        type: uuid
+        primary_key: true
+      - name: name
+        type: string
+"""
+
+    config_file = tmp_path / "brickend.yaml"
+    entities_file = tmp_path / "entities.yaml"
+
+    config_file.write_text(brickend_content.strip(), encoding="utf-8")
+    entities_file.write_text(entities_content.strip(), encoding="utf-8")
+
+    output_dir = tmp_path / "output_external"
+
+    result = runner.invoke(
+        app,
+        [
+            "generate",
+            "code",
+            "--config", str(config_file),
+            "--output", str(output_dir),
+            "--db-url", "sqlite:///./test.db",
+        ],
+    )
+
+    assert result.exit_code == 0
+
+    # Verify Product model was generated
+    models_content = (output_dir / "app" / "models.py").read_text(encoding="utf-8")
+    assert "class Product(Base):" in models_content

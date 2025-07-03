@@ -2,38 +2,22 @@
 test_protected_regions.py
 
 Unit tests for protected regions functionality in CodeGenerator and SmartProtectedRegionsHandler.
-Covers:
-  - Preservation of a single protected region across regenerations.
-  - Direct testing of SmartProtectedRegionsHandler.extract_protected_regions and inject_protected_regions.
-  - Verification of project file structure generation.
-  - Disabling of protected regions.
-  - Handling of multiple protected regions in one file.
-  - Robustness against malformed protected region markers.
-  - Debugging context structure for template expectations.
-  - Edge cases for extraction and injection with empty or missing files.
 """
 
 from pathlib import Path
 
 from brickend_core.engine.context_builder import ContextBuilder
-from brickend_core.engine import TemplateRegistry
+from brickend_core.engine.template_registry import TemplateRegistry
 from brickend_core.engine.template_engine import TemplateEngine
 from brickend_core.engine.code_generator import CodeGenerator
-from brickend_core.engine import SmartProtectedRegionsHandler
+from brickend_core.engine.protected_regions import SmartProtectedRegionsHandler
+from brickend_core.config.project_schema import BrickendProject, ProjectInfo, StackConfig
+from brickend_core.config.validation_schemas import EntityConfig
 
 
 def test_protected_regions(tmp_path):
     """
     Ensure that a protected region in user_crud.py is preserved across regenerations.
-
-    Steps:
-      1. Generate initial CRUD file for a User entity.
-      2. Manually insert a CRUD_METHODS protected region.
-      3. Regenerate code.
-      4. Verify the custom protected block remains in the regenerated file.
-
-    Args:
-        tmp_path (Path): Temporary directory fixture for output generation.
     """
     entities_dict = {
         "entities": [
@@ -45,24 +29,22 @@ def test_protected_regions(tmp_path):
             }
         ]
     }
-    builder = ContextBuilder()
-    context = builder.build_context(entities_dict)
 
-    template_dir = (
-        Path(__file__)
-        .parents[2]
-        / "src"
-        / "brickend_core"
-        / "integrations"
-        / "back"
-        / "fastapi"
+    # Crear configuración completa
+    config = BrickendProject(
+        project=ProjectInfo(name="test_project", version="1.0.0"),
+        stack=StackConfig(back="fastapi", database="postgresql"),
+        entities=[EntityConfig(**entity) for entity in entities_dict["entities"]]
     )
-    registry = TemplateRegistry([template_dir])
-    engine = TemplateEngine([template_dir], auto_reload=False)
+
+    # Usar la ruta base correcta
+    base_path = Path("src/brickend_core")
+    registry = TemplateRegistry(base_path)
+    engine = TemplateEngine(base_path)
 
     output_dir = tmp_path / "output"
-    generator = CodeGenerator(engine, registry, output_dir, preserve_protected_regions=True)
-    generator.generate_project(context, "fastapi")
+    generator = CodeGenerator(engine, registry, output_dir, preserve_protected_regions=True, config=config)
+    generator.generate_all()
 
     # Path to the generated CRUD file (now in app/crud/ directory)
     crud_path = output_dir / "app" / "crud" / "user_crud.py"
@@ -74,30 +56,15 @@ def test_protected_regions(tmp_path):
 
     original_lines = original_content.splitlines()
 
+    # Find insertion point after imports
     insert_index = None
     for i, line in enumerate(original_lines):
-        stripped = line.strip()
-        if stripped.startswith("from ") or stripped.startswith("import "):
-            for j in range(i + 1, len(original_lines)):
-                next_line = original_lines[j].strip()
-                if not next_line:
-                    continue
-                if next_line.startswith("def "):
-                    insert_index = i + 1
-                    break
-                if next_line.startswith("from ") or next_line.startswith("import "):
-                    break
-            if insert_index:
-                break
+        if line.strip() and not line.strip().startswith(('from ', 'import ', '#')):
+            insert_index = i
+            break
 
     if insert_index is None:
-        for i, line in enumerate(original_lines):
-            stripped = line.strip()
-            if not (stripped.startswith("from ") or stripped.startswith("import ")) and stripped:
-                insert_index = i
-                break
-
-    assert insert_index is not None, "Could not find insertion point for protected region"
+        insert_index = len(original_lines)
 
     protected_block = [
         "",  # blank line before
@@ -121,7 +88,8 @@ def test_protected_regions(tmp_path):
     print("=== MODIFIED CONTENT WITH PROTECTED REGION ===")
     print(modified_content)
 
-    generator.generate_project(context, "fastapi")
+    # Regenerate
+    generator.generate_all()
 
     new_content = crud_path.read_text(encoding="utf-8")
     print("=== CONTENT AFTER REGENERATION ===")
@@ -136,10 +104,6 @@ def test_protected_regions(tmp_path):
 def test_protected_regions_handler_directly():
     """
     Test the SmartProtectedRegionsHandler functionality directly.
-
-    Verifies:
-      - extract_protected_regions correctly identifies a well-formed region.
-      - inject_protected_regions reinserts the region into new content at the correct point.
     """
     handler = SmartProtectedRegionsHandler()
 
@@ -178,11 +142,6 @@ def create_user(db: Session, user_data):
 def test_project_structure_generation(tmp_path):
     """
     Test that the correct file structure is generated for multiple entities.
-
-    Verifies single-file templates under app/ and per-entity files in app/crud/ and app/routers/.
-
-    Args:
-        tmp_path (Path): Temporary directory fixture for output generation.
     """
     entities_dict = {
         "entities": [
@@ -202,24 +161,20 @@ def test_project_structure_generation(tmp_path):
             }
         ]
     }
-    builder = ContextBuilder()
-    context = builder.build_context(entities_dict)
 
-    template_dir = (
-        Path(__file__)
-        .parents[2]
-        / "src"
-        / "brickend_core"
-        / "integrations"
-        / "back"
-        / "fastapi"
+    config = BrickendProject(
+        project=ProjectInfo(name="test_project", version="1.0.0"),
+        stack=StackConfig(back="fastapi", database="postgresql"),
+        entities=[EntityConfig(**entity) for entity in entities_dict["entities"]]
     )
-    registry = TemplateRegistry([template_dir])
-    engine = TemplateEngine([template_dir], auto_reload=False)
+
+    base_path = Path("src/brickend_core")
+    registry = TemplateRegistry(base_path)
+    engine = TemplateEngine(base_path)
 
     output_dir = tmp_path / "output"
-    generator = CodeGenerator(engine, registry, output_dir)
-    generator.generate_project(context, "fastapi")
+    generator = CodeGenerator(engine, registry, output_dir, config=config)
+    generator.generate_all()
 
     # Verify single files are generated under app/ directory
     assert (output_dir / "app" / "models.py").exists(), "models.py not generated under app/"
@@ -239,9 +194,6 @@ def test_project_structure_generation(tmp_path):
 def test_disable_protected_regions(tmp_path):
     """
     Test that protected regions can be disabled and are overwritten on regeneration.
-
-    Args:
-        tmp_path (Path): Temporary directory fixture for output generation.
     """
     entities_dict = {
         "entities": [
@@ -253,26 +205,22 @@ def test_disable_protected_regions(tmp_path):
             }
         ]
     }
-    builder = ContextBuilder()
-    context = builder.build_context(entities_dict)
 
-    template_dir = (
-        Path(__file__)
-        .parents[2]
-        / "src"
-        / "brickend_core"
-        / "integrations"
-        / "back"
-        / "fastapi"
+    config = BrickendProject(
+        project=ProjectInfo(name="test_project", version="1.0.0"),
+        stack=StackConfig(back="fastapi", database="postgresql"),
+        entities=[EntityConfig(**entity) for entity in entities_dict["entities"]]
     )
-    registry = TemplateRegistry([template_dir])
-    engine = TemplateEngine([template_dir], auto_reload=False)
+
+    base_path = Path("src/brickend_core")
+    registry = TemplateRegistry(base_path)
+    engine = TemplateEngine(base_path)
 
     output_dir = tmp_path / "output"
 
     # Generate with protection disabled
-    generator = CodeGenerator(engine, registry, output_dir, preserve_protected_regions=False)
-    generator.generate_project(context, "fastapi")
+    generator = CodeGenerator(engine, registry, output_dir, preserve_protected_regions=False, config=config)
+    generator.generate_all()
 
     crud_path = output_dir / "app" / "crud" / "user_crud.py"
 
@@ -282,7 +230,7 @@ def test_disable_protected_regions(tmp_path):
     crud_path.write_text(modified_content, encoding="utf-8")
 
     # Regenerate - should overwrite everything since protection is disabled
-    generator.generate_project(context, "fastapi")
+    generator.generate_all()
 
     new_content = crud_path.read_text(encoding="utf-8")
     assert "# Custom code" not in new_content, "Protected region should not be preserved when protection is disabled"
@@ -291,11 +239,6 @@ def test_disable_protected_regions(tmp_path):
 def test_multiple_protected_regions(tmp_path):
     """
     Test handling of multiple protected regions in the same file.
-
-    Verifies that all inserted regions are preserved after code regeneration.
-
-    Args:
-        tmp_path (Path): Temporary directory fixture for output generation.
     """
     entities_dict = {
         "entities": [
@@ -307,24 +250,20 @@ def test_multiple_protected_regions(tmp_path):
             }
         ]
     }
-    builder = ContextBuilder()
-    context = builder.build_context(entities_dict)
 
-    template_dir = (
-        Path(__file__)
-        .parents[2]
-        / "src"
-        / "brickend_core"
-        / "integrations"
-        / "back"
-        / "fastapi"
+    config = BrickendProject(
+        project=ProjectInfo(name="test_project", version="1.0.0"),
+        stack=StackConfig(back="fastapi", database="postgresql"),
+        entities=[EntityConfig(**entity) for entity in entities_dict["entities"]]
     )
-    registry = TemplateRegistry([template_dir])
-    engine = TemplateEngine([template_dir], auto_reload=False)
+
+    base_path = Path("src/brickend_core")
+    registry = TemplateRegistry(base_path)
+    engine = TemplateEngine(base_path)
 
     output_dir = tmp_path / "output"
-    generator = CodeGenerator(engine, registry, output_dir, preserve_protected_regions=True)
-    generator.generate_project(context, "fastapi")
+    generator = CodeGenerator(engine, registry, output_dir, preserve_protected_regions=True, config=config)
+    generator.generate_all()
 
     crud_path = output_dir / "app" / "crud" / "user_crud.py"
 
@@ -332,13 +271,15 @@ def test_multiple_protected_regions(tmp_path):
     original_content = crud_path.read_text(encoding="utf-8")
     lines = original_content.splitlines()
 
-    # Insert first protected region after imports
-    insert_index1 = None
+    # Find insertion point
+    insert_index = None
     for i, line in enumerate(lines):
-        if line.strip().startswith("from ") or line.strip().startswith("import "):
-            insert_index1 = i + 1
+        if line.strip() and not line.strip().startswith(('from ', 'import ', '#')):
+            insert_index = i
+            break
 
-    assert insert_index1 is not None
+    if insert_index is None:
+        insert_index = len(lines)
 
     region1 = [
         "",
@@ -359,11 +300,11 @@ def test_multiple_protected_regions(tmp_path):
     ]
 
     # Insert both regions
-    modified_lines = lines[:insert_index1] + region1 + region2 + lines[insert_index1:]
+    modified_lines = lines[:insert_index] + region1 + region2 + lines[insert_index:]
     crud_path.write_text("\n".join(modified_lines), encoding="utf-8")
 
     # Regenerate
-    generator.generate_project(context, "fastapi")
+    generator.generate_all()
 
     # Verify both regions are preserved
     new_content = crud_path.read_text(encoding="utf-8")
@@ -376,8 +317,6 @@ def test_multiple_protected_regions(tmp_path):
 def test_protected_regions_with_syntax_errors():
     """
     Test that malformed protected region markers are ignored during extraction.
-
-    Verifies that only properly closed regions are extracted and others are skipped.
     """
     handler = SmartProtectedRegionsHandler()
 
@@ -408,11 +347,6 @@ def some_function():
 def test_debug_context_structure(tmp_path):
     """
     Debug test to inspect the context dictionary produced by ContextBuilder.
-
-    Prints out keys, entity count, and naming structures for manual inspection.
-
-    Args:
-        tmp_path (Path): Temporary directory fixture (unused in content).
     """
     entities_dict = {
         "entities": [
@@ -425,7 +359,7 @@ def test_debug_context_structure(tmp_path):
         ]
     }
     builder = ContextBuilder()
-    context = builder.build_context(entities_dict)
+    context = builder.build_context(entities_dict["entities"])  # ← FIX: pasar solo la lista
 
     print("=== CONTEXT STRUCTURE ===")
     print(f"Context keys: {list(context.keys())}")
@@ -453,17 +387,14 @@ def test_debug_context_structure(tmp_path):
 def test_edge_cases_protected_regions():
     """
     Test edge cases for protected regions handling.
-
-    Verifies:
-      - extract_protected_regions returns empty dict on empty content.
-      - No injection errors when injecting into content without functions.
-      - preserve_protected_regions returns new_content unchanged for non-existent files.
     """
     handler = SmartProtectedRegionsHandler()
 
+    # Empty content
     regions = handler.extract_protected_regions("")
     assert len(regions) == 0
 
+    # Normal content without regions
     normal_content = """from sqlalchemy.orm import Session
 
 def get_user():
@@ -472,6 +403,7 @@ def get_user():
     regions = handler.extract_protected_regions(normal_content)
     assert len(regions) == 0
 
+    # Inject into content without functions
     new_content = "# Just a comment"
     test_regions = {
         "TEST": ["# BRICKEND:PROTECTED-START TEST", "# code", "# BRICKEND:PROTECTED-END TEST"]
@@ -480,6 +412,7 @@ def get_user():
     result = handler.inject_protected_regions(new_content, test_regions)
     assert "# code" in result
 
+    # Test with non-existent file
     from pathlib import Path
     import tempfile
 

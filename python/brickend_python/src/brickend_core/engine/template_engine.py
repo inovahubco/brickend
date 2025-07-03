@@ -2,77 +2,35 @@
 template_engine.py
 
 Provides a Jinja2-based template engine for rendering templates to strings or files.
-Supports both legacy mode (multiple template directories) and plugin mode with
-user template priority system (templates_user/ > core_templates).
+Uses priority-based loading system (templates_user/ > core_templates) with triplet access.
 """
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 
 class TemplateEngine:
     """
-    A Jinja2 template engine that supports multiple operation modes:
-
-    1. LEGACY MODE: Load templates from multiple directories (backward compatibility)
-    2. PLUGIN MODE: Priority-based loading (templates_user/ > core_templates) with triplet access
+    A Jinja2 template engine with priority-based loading (templates_user/ > core_templates).
     """
 
     def __init__(
         self,
-        template_dirs: Optional[List[Path]] = None,
-        base_path: Optional[Path] = None,
+        base_path: Path,
         user_templates_dir: Optional[Path] = None,
         auto_reload: bool = False
     ) -> None:
         """
-        Initialize the TemplateEngine in legacy or plugin mode.
-
-        LEGACY MODE (for backward compatibility):
-            template_dirs: List of directories to search for templates
-
-        PLUGIN MODE (new functionality):
-            base_path: Base path containing integrations/ directory
-            user_templates_dir: Directory for user custom templates (defaults to "./templates_user")
+        Initialize the TemplateEngine with priority system.
 
         Args:
-            template_dirs (List[Path], optional): LEGACY mode - List of template directories
-            base_path (Path, optional): PLUGIN mode - Base path with integrations/
-            user_templates_dir (Path, optional): PLUGIN mode - User templates directory
-            auto_reload (bool): If True, Jinja2 will check for updated templates on each render
+            base_path: Base path containing integrations/ directory
+            user_templates_dir: Directory for user custom templates (defaults to "./templates_user")
+            auto_reload: If True, Jinja2 will check for updated templates on each render
         """
         self.auto_reload = auto_reload
-
-        # Determine operation mode
-        if template_dirs is not None:
-            # LEGACY MODE - Initialize with multiple template directories
-            self._init_legacy_mode(template_dirs)
-        elif base_path is not None:
-            # PLUGIN MODE - Initialize with priority system
-            self._init_plugin_mode(base_path, user_templates_dir)
-        else:
-            raise ValueError("Either template_dirs (legacy) or base_path (plugin mode) must be provided")
-
-    def _init_legacy_mode(self, template_dirs: List[Path]) -> None:
-        """Initialize engine in legacy mode for backward compatibility."""
-        self.mode = "legacy"
-        self.template_dirs = template_dirs
-        self.base_path = None
-        self.user_templates_dir = None
-
-        # Set up Jinja2 environment with multiple directories
-        loader_paths = [str(d.resolve()) for d in template_dirs]
-        self.env = Environment(
-            loader=FileSystemLoader(loader_paths),
-            autoescape=select_autoescape(["j2", "jinja"]),
-            auto_reload=self.auto_reload,
-        )
-
-    def _init_plugin_mode(self, base_path: Path, user_templates_dir: Optional[Path]) -> None:
-        """Initialize engine in plugin mode with priority system."""
-        self.mode = "plugin"
         self.base_path = base_path.resolve()
 
         if user_templates_dir is not None:
@@ -82,8 +40,6 @@ class TemplateEngine:
                 self.user_templates_dir = self.base_path / user_templates_dir
         else:
             self.user_templates_dir = self.base_path / "templates_user"
-
-        self.template_dirs = None
 
         # Build prioritized template directories for Jinja2
         search_paths = []
@@ -113,7 +69,7 @@ class TemplateEngine:
         )
 
     # =============================================================================
-    # LEGACY INTERFACE (maintain backward compatibility)
+    # BASIC RENDERING INTERFACE
     # =============================================================================
 
     def render_to_string(self, template_name: str, context: Dict[str, Any]) -> str:
@@ -121,14 +77,14 @@ class TemplateEngine:
         Render a template with the given context and return the result as a string.
 
         Args:
-            template_name (str): The filename of the template (e.g., "model_template.j2").
-            context (Dict[str, Any]): Mapping of variable names to values for rendering.
+            template_name: The filename of the template (e.g., "model_template.j2").
+            context: Mapping of variable names to values for rendering.
 
         Returns:
             str: The rendered template as a Unicode string.
 
         Raises:
-            jinja2.TemplateNotFound: If the template file cannot be found in any of the template_dirs.
+            jinja2.TemplateNotFound: If the template file cannot be found in any of the template directories.
             jinja2.TemplateSyntaxError: If there is a syntax error in the template.
         """
         template = self.env.get_template(template_name)
@@ -141,9 +97,9 @@ class TemplateEngine:
         This method will create parent directories of the destination path if they do not exist.
 
         Args:
-            template_name (str): The filename of the template (e.g., "router_template.j2").
-            context (Dict[str, Any]): Mapping of variable names to values for rendering.
-            destination (Path): Full path (including filename) where rendered output will be written.
+            template_name: The filename of the template (e.g., "router_template.j2").
+            context: Mapping of variable names to values for rendering.
+            destination: Full path (including filename) where rendered output will be written.
 
         Raises:
             jinja2.TemplateNotFound: If the template file cannot be found.
@@ -156,7 +112,7 @@ class TemplateEngine:
             f.write(rendered_content)
 
     # =============================================================================
-    # PLUGIN MODE INTERFACE (new functionality with priority system)
+    # PRIORITY SYSTEM INTERFACE
     # =============================================================================
 
     def get_template_path(self, category: str, stack: str, component: str) -> Path:
@@ -168,15 +124,14 @@ class TemplateEngine:
         2. {base_path}/integrations/{category}/{stack}/{component}_template.j2
 
         Args:
-            category (str): Template category (e.g., "back", "infra")
-            stack (str): Stack name (e.g., "fastapi", "django")
-            component (str): Component name (e.g., "models", "schemas")
+            category: Template category (e.g., "back", "infra")
+            stack: Stack name (e.g., "fastapi", "django")
+            component: Component name (e.g., "models", "schemas")
 
         Returns:
             Path: Full path to the template file with the highest priority
 
         Raises:
-            RuntimeError: If engine is not in plugin mode
             FileNotFoundError: If no template is found in any location
 
         Example:
@@ -184,9 +139,6 @@ class TemplateEngine:
             # Returns: templates_user/back/fastapi/models_template.j2 (if exists)
             # Or: src/brickend_core/integrations/back/fastapi/models_template.j2
         """
-        if self.mode != "plugin":
-            raise RuntimeError("get_template_path() requires plugin mode initialization")
-
         template_filename = f"{component}_template.j2"
 
         # 1. Check user templates directory (highest priority)
@@ -212,8 +164,8 @@ class TemplateEngine:
         Render a template using its full file path.
 
         Args:
-            template_path (Path): Full path to the template file
-            context (Dict[str, Any]): Template context variables
+            template_path: Full path to the template file
+            context: Template context variables
 
         Returns:
             str: Rendered template content
@@ -255,17 +207,14 @@ class TemplateEngine:
         Render a component template using the priority system.
 
         Args:
-            category (str): Template category
-            stack (str): Stack name
-            component (str): Component name
-            context (Dict[str, Any]): Template context variables
+            category: Template category
+            stack: Stack name
+            component: Component name
+            context: Template context variables
 
         Returns:
             str: Rendered template content
         """
-        if self.mode != "plugin":
-            raise RuntimeError("render_component_to_string() requires plugin mode initialization")
-
         template_path = self.get_template_path(category, stack, component)
         return self.render_template_by_path(template_path, context)
 
@@ -281,15 +230,12 @@ class TemplateEngine:
         Render a component template to a file using the priority system.
 
         Args:
-            category (str): Template category
-            stack (str): Stack name
-            component (str): Component name
-            context (Dict[str, Any]): Template context variables
-            destination (Path): Output file path
+            category: Template category
+            stack: Stack name
+            component: Component name
+            context: Template context variables
+            destination: Output file path
         """
-        if self.mode != "plugin":
-            raise RuntimeError("render_component_to_file() requires plugin mode initialization")
-
         rendered_content = self.render_component_to_string(category, stack, component, context)
         destination.parent.mkdir(parents=True, exist_ok=True)
         with destination.open("w", encoding="utf-8") as f:
@@ -299,20 +245,18 @@ class TemplateEngine:
     # UTILITY METHODS
     # =============================================================================
 
-    def list_available_templates(self, category: Optional[str] = None, stack: Optional[str] = None) -> Dict[str, List[str]]:
+    def list_available_templates(self, category: Optional[str] = None, stack: Optional[str] = None) -> dict[
+        Any, dict[Any, Any]]:
         """
         List all available templates, organized by category and stack.
 
         Args:
-            category (str, optional): Filter by specific category
-            stack (str, optional): Filter by specific stack (requires category)
+            category: Filter by specific category
+            stack: Filter by specific stack (requires category)
 
         Returns:
             Dict[str, List[str]]: Nested dict of {category: {stack: [components]}}
         """
-        if self.mode != "plugin":
-            raise RuntimeError("list_available_templates() requires plugin mode initialization")
-
         templates = {}
 
         # Scan both user and core template directories
@@ -363,9 +307,6 @@ class TemplateEngine:
 
     def has_user_template(self, category: str, stack: str, component: str) -> bool:
         """Check if a user template exists (in templates_user/ directory)."""
-        if self.mode != "plugin":
-            return False
-
         user_template = self.user_templates_dir / category / stack / f"{component}_template.j2"
         return user_template.exists()
 
@@ -376,9 +317,6 @@ class TemplateEngine:
         Returns:
             Dict with keys: 'path', 'source' ('user' or 'core'), 'exists'
         """
-        if self.mode != "plugin":
-            raise RuntimeError("get_template_info() requires plugin mode initialization")
-
         user_template = self.user_templates_dir / category / stack / f"{component}_template.j2"
         core_template = self.base_path / "integrations" / category / stack / f"{component}_template.j2"
 

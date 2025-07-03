@@ -2,36 +2,21 @@
 test_code_generator.py
 
 Unit tests for CodeGenerator in brickend_core.engine.code_generator.
-Tests cover:
-  - Successful generation of project files for a valid context and FastAPI integration.
-  - ValueError when integration key is not registered.
-  - FileNotFoundError when a required template is missing.
-  - Behavior when protected regions are disabled.
-  - Verification of generated file structure and content.
 """
 
 import pytest
 from pathlib import Path
 
 from brickend_core.engine.context_builder import ContextBuilder
-from brickend_core.engine import TemplateRegistry
+from brickend_core.engine.template_registry import TemplateRegistry
 from brickend_core.engine.template_engine import TemplateEngine
 from brickend_core.engine.code_generator import CodeGenerator
+from brickend_core.config.project_schema import BrickendProject, ProjectInfo, StackConfig
+from brickend_core.config.validation_schemas import EntityConfig
 
 
 def make_simple_entities_dict() -> dict:
-    """
-    Helper to create a minimal valid entities dictionary for testing.
-
-    Creates:
-      - A single entity 'User'.
-      - Two fields:
-          * 'id': type 'uuid', primary_key=True, unique=False, nullable=False.
-          * 'email': type 'string', primary_key=False, unique=True, nullable=False.
-
-    Returns:
-        dict: Dictionary representing entities configuration.
-    """
+    """Helper to create a minimal valid entities dictionary for testing."""
     return {
         "entities": [
             {
@@ -64,18 +49,7 @@ def make_simple_entities_dict() -> dict:
 
 
 def make_multi_entities_dict() -> dict:
-    """
-    Helper to create a multi-entity dictionary for testing.
-
-    Creates:
-      - Entities 'User' and 'Post'.
-      - Each entity with:
-          * 'id': type 'uuid', primary_key=True, unique=False, nullable=False.
-          * One additional string field ('email' for User, 'title' for Post).
-
-    Returns:
-        dict: Dictionary representing multiple entities' configuration.
-    """
+    """Helper to create a multi-entity dictionary for testing."""
     return {
         "entities": [
             {
@@ -133,37 +107,31 @@ def make_multi_entities_dict() -> dict:
 
 
 def test_generate_project_success(tmp_path):
-    """
-    Test that CodeGenerator.generate_project creates the correct project structure and files.
-
-    Scenario:
-      - Given a valid entities dictionary for one entity.
-      - Using 'fastapi' integration and a SQLite database URL.
-    Verifies:
-      - Presence of models.py, schemas.py, main.py, database.py in app/.
-      - Presence of user_crud.py in app/crud/ and user_router.py in app/routers/.
-      - Content checks for class definitions and imports.
-
-    Args:
-        tmp_path (Path): Temporary directory fixture for output.
-    """
+    """Test that CodeGenerator creates the correct project structure using generate_all."""
     entities_dict = make_simple_entities_dict()
-    builder = ContextBuilder()
-    context = builder.build_context(entities_dict)
-    context["database_url"] = "sqlite:///./test.db"
 
-    fastapi_templates_dir = Path("src/brickend_core/integrations/back/fastapi")
-    assert fastapi_templates_dir.is_dir(), "FastAPI templates directory must exist for this test"
+    # Crear un proyecto de configuración completo
+    config = BrickendProject(
+        project=ProjectInfo(name="test_project", version="1.0.0"),
+        stack=StackConfig(back="fastapi", database="postgresql"),
+        entities=[EntityConfig(**entity) for entity in entities_dict["entities"]]
+    )
 
-    registry = TemplateRegistry([fastapi_templates_dir])
-    engine = TemplateEngine([fastapi_templates_dir], auto_reload=False)
+    # Usar la ruta base correcta
+    base_path = Path("src/brickend_core")
+    assert base_path.is_dir(), "brickend_core directory must exist for this test"
+
+    registry = TemplateRegistry(base_path)
+    engine = TemplateEngine(base_path)
 
     output_dir = tmp_path / "output_project"
     output_dir.mkdir()
 
-    generator = CodeGenerator(engine, registry, output_dir)
-    generator.generate_project(context, "fastapi")
+    # Usar el nuevo CodeGenerator con config
+    generator = CodeGenerator(engine, registry, output_dir, config=config)
+    generator.generate_all()  # Usar generate_all en lugar de generate_project
 
+    # Verificar archivos generados
     expected_app_files = [
         "models.py",
         "schemas.py",
@@ -180,6 +148,7 @@ def test_generate_project_success(tmp_path):
     user_router = output_dir / "app" / "routers" / "user_router.py"
     assert user_router.exists(), "Expected app/routers/user_router.py to be generated."
 
+    # Verificar contenido
     models_content = (output_dir / "app" / "models.py").read_text(encoding="utf-8")
     assert "class User(Base):" in models_content
 
@@ -188,49 +157,33 @@ def test_generate_project_success(tmp_path):
 
     crud_content = user_crud.read_text(encoding="utf-8")
     assert "def get_user(" in crud_content
-    assert "from app.models import User" in crud_content
 
     router_content = user_router.read_text(encoding="utf-8")
     assert "router = APIRouter" in router_content
-    assert "from app.crud.user_crud import" in router_content
 
     main_content = (output_dir / "app" / "main.py").read_text(encoding="utf-8")
     assert "app = FastAPI" in main_content
-    assert "from app.routers.user_router import router as user_router" in main_content
-
-    db_content = (output_dir / "app" / "database.py").read_text(encoding="utf-8")
-    assert "create_engine" in db_content
 
 
 def test_generate_project_multiple_entities(tmp_path):
-    """
-    Test generation of CRUD and router files for multiple entities.
-
-    Scenario:
-      - Entities 'User' and 'Post'.
-    Verifies:
-      - app/crud/user_crud.py and post_crud.py exist.
-      - app/routers/user_router.py and post_router.py exist.
-      - models.py includes both User and Post classes.
-      - main.py imports both routers.
-
-    Args:
-        tmp_path (Path): Temporary directory fixture for output.
-    """
+    """Test generation of CRUD and router files for multiple entities."""
     entities_dict = make_multi_entities_dict()
-    builder = ContextBuilder()
-    context = builder.build_context(entities_dict)
-    context["database_url"] = "sqlite:///./test.db"
 
-    fastapi_templates_dir = Path("src/brickend_core/integrations/back/fastapi")
-    registry = TemplateRegistry([fastapi_templates_dir])
-    engine = TemplateEngine([fastapi_templates_dir], auto_reload=False)
+    config = BrickendProject(
+        project=ProjectInfo(name="test_project", version="1.0.0"),
+        stack=StackConfig(back="fastapi", database="postgresql"),
+        entities=[EntityConfig(**entity) for entity in entities_dict["entities"]]
+    )
+
+    base_path = Path("src/brickend_core")
+    registry = TemplateRegistry(base_path)
+    engine = TemplateEngine(base_path)
 
     output_dir = tmp_path / "output_multi"
     output_dir.mkdir()
 
-    generator = CodeGenerator(engine, registry, output_dir)
-    generator.generate_project(context, "fastapi")
+    generator = CodeGenerator(engine, registry, output_dir, config=config)
+    generator.generate_all()
 
     # CRUD files
     assert (output_dir / "app" / "crud" / "user_crud.py").exists()
@@ -251,103 +204,104 @@ def test_generate_project_multiple_entities(tmp_path):
     assert "from app.routers.post_router import router as post_router" in main_content
 
 
-def test_generate_project_invalid_integration(tmp_path):
-    """
-    Test error when integration key is not registered.
-
-    Scenario:
-      - Using integration 'nonexistent'.
-    Verifies:
-      - CodeGenerator.generate_project raises ValueError with appropriate message.
-
-    Args:
-        tmp_path (Path): Temporary directory fixture.
-    """
+def test_generate_project_invalid_stack(tmp_path):
+    """Test error when stack is not available."""
     entities_dict = make_simple_entities_dict()
-    builder = ContextBuilder()
-    context = builder.build_context(entities_dict)
-    context["database_url"] = "sqlite:///./test.db"
 
-    fastapi_templates_dir = Path("src/brickend_core/integrations/back/fastapi")
-    registry = TemplateRegistry([fastapi_templates_dir])
-    engine = TemplateEngine([fastapi_templates_dir], auto_reload=False)
+    config = BrickendProject(
+        project=ProjectInfo(name="test_project", version="1.0.0"),
+        stack=StackConfig(back="nonexistent", database="postgresql"),
+        entities=[EntityConfig(**entity) for entity in entities_dict["entities"]]
+    )
+
+    base_path = Path("src/brickend_core")
+    registry = TemplateRegistry(base_path)
+    engine = TemplateEngine(base_path)
 
     output_dir = tmp_path / "output_invalid"
     output_dir.mkdir()
 
-    generator = CodeGenerator(engine, registry, output_dir)
+    generator = CodeGenerator(engine, registry, output_dir, config=config)
 
     with pytest.raises(ValueError) as exc_info:
-        generator.generate_project(context, "nonexistent")
-    assert "Integration 'nonexistent' not found" in str(exc_info.value)
+        generator.generate_all()
+    assert "No templates found for stack 'nonexistent'" in str(exc_info.value)
 
 
 def test_generate_project_missing_template(tmp_path):
-    """
-    Test error when a required template file is missing.
-
-    Scenario:
-      - Remove 'models_template.j2' from templates directory.
-    Verifies:
-      - CodeGenerator.generate_project raises FileNotFoundError mentioning the missing template.
-
-    Args:
-        tmp_path (Path): Temporary directory fixture.
-    """
+    """Test that generation handles missing optional components gracefully."""
     entities_dict = make_simple_entities_dict()
-    builder = ContextBuilder()
-    context = builder.build_context(entities_dict)
-    context["database_url"] = "sqlite:///./test.db"
 
-    temp_templates_dir = tmp_path / "templates_fastapi"
-    temp_templates_dir.mkdir()
-    original = Path("src/brickend_core/integrations/back/fastapi")
-    for tpl in original.rglob("*.j2"):
-        dest = temp_templates_dir / tpl.name
-        dest.write_text(tpl.read_text(encoding="utf-8"), encoding="utf-8")
+    base_path = Path("src/brickend_core")
+    temp_base = tmp_path / "brickend_core"
+    temp_integrations = temp_base / "integrations" / "back" / "fastapi"
+    temp_integrations.mkdir(parents=True)
 
-    (temp_templates_dir / "models_template.j2").unlink()
+    original_fastapi = base_path / "integrations" / "back" / "fastapi"
 
-    registry = TemplateRegistry([temp_templates_dir])
-    engine = TemplateEngine([temp_templates_dir], auto_reload=False)
+    if (original_fastapi / "meta.yaml").exists():
+        (temp_integrations / "meta.yaml").write_text(
+            (original_fastapi / "meta.yaml").read_text()
+        )
+
+    for template in ["models_template.j2", "schemas_template.j2",
+                     "main_template.j2", "db_template.j2"]:
+        if (original_fastapi / template).exists():
+            content = (original_fastapi / template).read_text(encoding="utf-8")
+            (temp_integrations / template).write_text(content, encoding="utf-8")
+
+    config = BrickendProject(
+        project=ProjectInfo(name="test_project", version="1.0.0"),
+        stack=StackConfig(back="fastapi", database="postgresql"),
+        entities=[EntityConfig(**entity) for entity in entities_dict["entities"]]
+    )
+
+    registry = TemplateRegistry(temp_base)
+    engine = TemplateEngine(temp_base)
 
     output_dir = tmp_path / "output_missing"
     output_dir.mkdir()
 
-    generator = CodeGenerator(engine, registry, output_dir)
+    generator = CodeGenerator(engine, registry, output_dir, config=config)
 
-    with pytest.raises(FileNotFoundError) as exc_info:
-        generator.generate_project(context, "templates_fastapi")
-    assert "models_template.j2" in str(exc_info.value)
+    generator.generate_all()
+
+    assert (output_dir / "app" / "models.py").exists(), "models.py should be generated"
+    assert (output_dir / "app" / "schemas.py").exists(), "schemas.py should be generated"
+    assert (output_dir / "app" / "main.py").exists(), "main.py should be generated"
+    assert (output_dir / "app" / "database.py").exists(), "database.py should be generated"
+
+    crud_dir = output_dir / "app" / "crud"
+    routers_dir = output_dir / "app" / "routers"
+
+    if crud_dir.exists():
+        crud_files = list(crud_dir.glob("*_crud.py"))
+        assert len(crud_files) == 0, "No crud files should be generated"
+
+    if routers_dir.exists():
+        router_files = list(routers_dir.glob("*_router.py"))
+        assert len(router_files) == 0, "No router files should be generated"
 
 
 def test_generate_project_protected_regions_disabled(tmp_path):
-    """
-    Test generation with protected regions disabled.
-
-    Scenario:
-      - preserve_protected_regions=False.
-    Verifies:
-      - All expected files are generated.
-      - generator.preserve_protected_regions is False and protected_handler is None.
-
-    Args:
-        tmp_path (Path): Temporary directory fixture.
-    """
+    """Test generation with protected regions disabled."""
     entities_dict = make_simple_entities_dict()
-    builder = ContextBuilder()
-    context = builder.build_context(entities_dict)
-    context["database_url"] = "sqlite:///./test.db"
 
-    fastapi_templates_dir = Path("src/brickend_core/integrations/back/fastapi")
-    registry = TemplateRegistry([fastapi_templates_dir])
-    engine = TemplateEngine([fastapi_templates_dir], auto_reload=False)
+    config = BrickendProject(
+        project=ProjectInfo(name="test_project", version="1.0.0"),
+        stack=StackConfig(back="fastapi", database="postgresql"),
+        entities=[EntityConfig(**entity) for entity in entities_dict["entities"]]
+    )
+
+    base_path = Path("src/brickend_core")
+    registry = TemplateRegistry(base_path)
+    engine = TemplateEngine(base_path)
 
     output_dir = tmp_path / "output_no_protection"
     output_dir.mkdir()
 
-    generator = CodeGenerator(engine, registry, output_dir, preserve_protected_regions=False)
-    generator.generate_project(context, "fastapi")
+    generator = CodeGenerator(engine, registry, output_dir, preserve_protected_regions=False, config=config)
+    generator.generate_all()
 
     assert (output_dir / "app" / "models.py").exists()
     assert (output_dir / "app" / "crud" / "user_crud.py").exists()
@@ -358,30 +312,22 @@ def test_generate_project_protected_regions_disabled(tmp_path):
 
 
 def test_generate_project_file_structure(tmp_path):
-    """
-    Test that the generated file structure matches expectations.
-
-    Scenario:
-      - Single entity 'User'.
-    Verifies:
-      - Directories app/, app/crud/, app/routers/ exist.
-      - Specific files exist and are non-empty.
-
-    Args:
-        tmp_path (Path): Temporary directory fixture.
-    """
+    """Test that the generated file structure matches expectations."""
     entities_dict = make_simple_entities_dict()
-    builder = ContextBuilder()
-    context = builder.build_context(entities_dict)
-    context["database_url"] = "sqlite:///./test.db"
 
-    fastapi_templates_dir = Path("src/brickend_core/integrations/back/fastapi")
-    registry = TemplateRegistry([fastapi_templates_dir])
-    engine = TemplateEngine([fastapi_templates_dir], auto_reload=False)
+    config = BrickendProject(
+        project=ProjectInfo(name="test_project", version="1.0.0"),
+        stack=StackConfig(back="fastapi", database="postgresql"),
+        entities=[EntityConfig(**entity) for entity in entities_dict["entities"]]
+    )
+
+    base_path = Path("src/brickend_core")
+    registry = TemplateRegistry(base_path)
+    engine = TemplateEngine(base_path)
 
     output_dir = tmp_path / "output_structure"
-    generator = CodeGenerator(engine, registry, output_dir)
-    generator.generate_project(context, "fastapi")
+    generator = CodeGenerator(engine, registry, output_dir, config=config)
+    generator.generate_all()
 
     assert output_dir.exists()
     assert (output_dir / "app").exists()

@@ -291,10 +291,6 @@ def init_project(
     author: Optional[str] = typer.Option(
         None, "--author", "-a", help="Author name"
     ),
-    # Maintain backward compatibility with the original parameter
-    project_type: Optional[str] = typer.Option(
-        None, "--type", "-t", help="[DEPRECATED] Use --stack instead", hidden=True
-    ),
 ) -> None:
     """Create a new Brickend project with hybrid configuration support.
 
@@ -309,16 +305,11 @@ def init_project(
         stack: Backend stack type (fastapi, django, etc.)
         description: Optional project description
         author: Optional author name
-        project_type: [DEPRECATED] Legacy parameter for backward compatibility
 
     Examples:
         brickend init my-api --stack fastapi --author "John Doe"
         brickend init blog-api --stack django --description "Blog API with Django"
     """
-    # Handle backward compatibility
-    if project_type is not None:
-        console.print("[yellow]Warning: --type is deprecated, use --stack instead[/yellow]")
-        stack = project_type
 
     # Validate project name
     if not name.replace('_', '').replace('-', '').isalnum():

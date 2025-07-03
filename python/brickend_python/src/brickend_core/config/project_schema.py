@@ -118,9 +118,41 @@ class ProjectSettings(BaseModel):
     authorization: bool = False
     file_uploads: bool = False
     email_service: bool = False
+    database_url: Optional[str] = None
     custom_middleware: List[str] = Field(default_factory=list)
     feature_flags: Dict[str, bool] = Field(default_factory=dict)
     integrations: Dict[str, Any] = Field(default_factory=dict)
+
+    class Config:
+        extra = "allow"
+
+    @field_validator("database_url")
+    @classmethod
+    def validate_database_url(cls, v: Optional[str]) -> Optional[str]:
+        """Validate database URL format if provided."""
+        if v is None:
+            return v
+
+        # Basic URL validation
+        if not v.strip():
+            return None
+
+        # Check common database URL patterns
+        url_patterns = [
+            r"^sqlite:///.*\.db$",  # SQLite: sqlite:///./test.db
+            r"^postgresql://.*",    # PostgreSQL: postgresql://user:pass@host:port/db
+            r"^mysql://.*",         # MySQL: mysql://user:pass@host:port/db
+            r"^mongodb://.*",       # MongoDB: mongodb://host:port/db
+        ]
+
+        url = v.strip()
+        if not any(re.match(pattern, url) for pattern in url_patterns):
+            raise ValueError(
+                "Invalid database URL format. Examples: "
+                "'sqlite:///./test.db', 'postgresql://user:pass@host:port/db'"
+            )
+
+        return url
 
 
 class BrickendProject(BaseModel):
@@ -144,8 +176,12 @@ class BrickendProject(BaseModel):
     plugins: Dict[str, Any] = Field(default_factory=dict)
     custom: Dict[str, Any] = Field(default_factory=dict)
 
+    # Internal field to track original entities mode
+    _original_entities_path: Optional[str] = None
+
     class Config:
         extra = "allow"
+        underscore_attrs_are_private = True
 
     @field_validator("entities")
     @classmethod

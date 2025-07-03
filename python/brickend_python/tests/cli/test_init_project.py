@@ -3,11 +3,10 @@ test_init_project.py
 
 Unit tests for the 'init project' CLI command in brickend_cli.commands.init_project.
 Covers:
-  - LEGACY: Successful initialization with legacy parameters (backward compatibility)
-  - LEGACY: Error handling for existing folders and invalid types
-  - NEW: Hybrid configuration generation (brickend.yaml + entities.yaml)
-  - NEW: Stack validation and parameter handling
-  - NEW: File customization and Rich UI output
+  - Hybrid configuration generation (brickend.yaml + entities.yaml)
+  - Stack validation and parameter handling
+  - File customization and Rich UI output
+  - Error handling for existing folders and invalid stacks
 """
 
 import pytest
@@ -102,93 +101,11 @@ def mock_django_skeleton():
 
 
 # =============================================================================
-# EXISTING TESTS (maintain backward compatibility)
-# =============================================================================
-
-def test_init_project_success(tmp_path, mock_skeleton_structure):
-    """Test successful project initialization"""
-    runner = CliRunner()
-
-    with runner.isolated_filesystem():
-        project_root = Path.cwd()
-        skeleton_dir = mock_skeleton_structure(project_root, "fastapi")
-
-        versions_dir = skeleton_dir / "migrations" / "versions"
-        assert versions_dir.exists(), f"Skeleton versions dir should exist: {list(skeleton_dir.rglob('*'))}"
-
-        result = runner.invoke(cli_app, ["init", "project", "demo_app", "--type", "fastapi"])
-        assert result.exit_code == 0, f"CLI failed: {result.stdout}\n{result.stderr}"
-
-        assert ("created successfully" in result.stdout or
-                "✅" in result.stdout or
-                "Success" in result.stdout)
-
-        demo_dir = Path("demo_app")
-
-        if not (demo_dir / "migrations" / "versions").is_dir():
-            print(f"DEBUG: Demo dir contents: {list(demo_dir.rglob('*'))}")
-            print(
-                f"DEBUG: Migrations dir contents: {list((demo_dir / 'migrations').iterdir()) if (demo_dir / 'migrations').exists() else 'migrations dir does not exist'}")
-
-        assert (demo_dir / "app" / "__init__.py").exists()
-        assert (demo_dir / "migrations" / "env.py").exists()
-        assert (demo_dir / "migrations" / "script.py.mako").exists()
-
-        assert (demo_dir / "migrations").is_dir()
-        # TODO: Fix the implementation to copy empty directories correctly
-        # assert (demo_dir / "migrations" / "versions").is_dir()
-
-        assert (demo_dir / "alembic.ini").exists()
-        assert (demo_dir / "entities.yaml").exists()
-        assert (demo_dir / "requirements.txt").exists()
-        assert (demo_dir / "README.md").exists()
-
-        assert (demo_dir / "brickend.yaml").exists()
-
-
-def test_init_project_folder_exists(tmp_path, mock_skeleton_structure):
-    """
-    If the target folder already exists, init should exit with an error.
-
-    Args:
-        tmp_path: Temporary directory provided by pytest.
-    """
-    runner = CliRunner()
-
-    with runner.isolated_filesystem():
-        project_root = Path.cwd()
-        mock_skeleton_structure(project_root, "fastapi")
-        Path("existing_app").mkdir()
-
-        result = runner.invoke(cli_app, ["init", "project", "existing_app", "--type", "fastapi"])
-        assert result.exit_code != 0
-        assert "Error: The directory 'existing_app' already exists." in result.stdout
-
-
-def test_init_project_invalid_type(tmp_path, mock_skeleton_structure):
-    """
-    If the skeleton type is invalid, init should exit with an error indicating missing skeleton.
-
-    Args:
-        tmp_path: Temporary directory provided by pytest.
-    """
-    runner = CliRunner()
-
-    with runner.isolated_filesystem():
-        project_root = Path.cwd()
-        mock_skeleton_structure(project_root, "fastapi")
-
-        result = runner.invoke(cli_app, ["init", "project", "new_app", "--type", "invalid_type"])
-        assert result.exit_code != 0
-        assert "Error: Stack 'invalid_type' is not available." in result.stdout
-
-
-# =============================================================================
-# NEW TESTS FOR HYBRID CONFIGURATION
+# HYBRID CONFIGURATION TESTS
 # =============================================================================
 
 class TestInitProject:
-    """Test suite for new hybrid configuration functionality."""
+    """Test suite for hybrid configuration functionality."""
 
     def test_init_generates_brickend_yaml(self, mock_skeleton_structure):
         """Test that init generates correct brickend.yaml with hybrid configuration."""
@@ -272,34 +189,8 @@ class TestInitProject:
                     config = yaml.load(f)
                 assert config["stack"]["back"] == "fastapi"
 
-            # TODO: Test Django when the skeleton is implemented
-            # For now, skip Django test
-
-    def test_init_backward_compatibility_type_parameter(self, mock_skeleton_structure):
-        """Test that --type parameter still works but shows deprecation warning."""
-        runner = CliRunner()
-
-        with runner.isolated_filesystem():
-            project_root = Path.cwd()
-            mock_skeleton_structure(project_root, "fastapi")
-
-            result = runner.invoke(cli_app, ["init", "project", "legacy_project", "--type", "fastapi"])
-            assert result.exit_code == 0
-
-            # Should show deprecation warning
-            assert "Warning: --type is deprecated, use --stack instead" in result.stdout
-
-            # Should still create correct configuration
-            brickend_file = Path("legacy_project") / "brickend.yaml"
-            assert brickend_file.exists()
-
-            yaml = ruamel.yaml.YAML(typ="safe")
-            with brickend_file.open("r", encoding="utf-8") as f:
-                config = yaml.load(f)
-            assert config["stack"]["back"] == "fastapi"
-
     def test_init_project_name_validation(self, mock_skeleton_structure):
-        """Test validation"""
+        """Test project name validation"""
         runner = CliRunner()
 
         with runner.isolated_filesystem():
@@ -534,6 +425,31 @@ class TestInitProjectIntegration:
 class TestInitProjectErrorHandling:
     """Test error handling scenarios."""
 
+    def test_init_project_folder_exists(self, mock_skeleton_structure):
+        """Test that init fails when target folder already exists."""
+        runner = CliRunner()
+
+        with runner.isolated_filesystem():
+            project_root = Path.cwd()
+            mock_skeleton_structure(project_root, "fastapi")
+            Path("existing_app").mkdir()
+
+            result = runner.invoke(cli_app, ["init", "project", "existing_app", "--stack", "fastapi"])
+            assert result.exit_code != 0
+            assert "Error: The directory 'existing_app' already exists." in result.stdout
+
+    def test_init_project_invalid_stack(self, mock_skeleton_structure):
+        """Test that init fails with invalid stack and shows available options."""
+        runner = CliRunner()
+
+        with runner.isolated_filesystem():
+            project_root = Path.cwd()
+            mock_skeleton_structure(project_root, "fastapi")
+
+            result = runner.invoke(cli_app, ["init", "project", "new_app", "--stack", "invalid_stack"])
+            assert result.exit_code != 0
+            assert "Error: Stack 'invalid_stack' is not available." in result.stdout
+
     def test_init_no_skeleton_directory(self):
         """Test behavior when skeleton doesn't exist"""
         runner = CliRunner()
@@ -604,7 +520,7 @@ class TestInitProjectPerformance:
     """Test performance aspects of init command."""
 
     def test_init_large_skeleton(self, mock_skeleton_structure):
-        """Test init performance"""
+        """Test init performance with larger skeleton."""
         runner = CliRunner()
 
         with runner.isolated_filesystem():

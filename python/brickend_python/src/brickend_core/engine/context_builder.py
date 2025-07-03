@@ -2,7 +2,7 @@
 context_builder.py
 
 ContextBuilder transforms entity definitions into a richer context suitable for rendering Jinja2 templates.
-Supports both legacy format (raw dictionaries) and new format (Pydantic EntityConfig objects).
+Supports Pydantic EntityConfig objects and raw dictionary format.
 """
 
 from typing import Any, Dict, List, Union
@@ -13,15 +13,7 @@ from brickend_core.utils.naming import (
     to_kebab_case,
     validate_name,
 )
-
-# Import EntityConfig for type checking and new format support
-try:
-    from brickend_core.config.validation_schemas import EntityConfig, FieldConfig
-    PYDANTIC_AVAILABLE = True
-except ImportError:
-    PYDANTIC_AVAILABLE = False
-    EntityConfig = Any
-    FieldConfig = Any
+from brickend_core.config.validation_schemas import EntityConfig
 
 TYPE_MAPPING: Dict[str, str] = {
     "uuid": "UUID",
@@ -38,9 +30,9 @@ class ContextBuilder:
     """
     Build a template context from entity definitions.
 
-    Supports both formats:
-    - Legacy: Dictionary with {"entities": [...]} structure
+    Supports:
     - Modern: List of EntityConfig Pydantic objects
+    - Raw: List of dictionaries
 
     The generated context includes:
       - A list of entities with name variations and field metadata.
@@ -52,13 +44,12 @@ class ContextBuilder:
         """Initialize a ContextBuilder instance."""
         pass
 
-    def build_context(self, entities_input: Union[Dict[str, Any], List[EntityConfig], List[Dict[str, Any]]]) -> Dict[str, Any]:
+    def build_context(self, entities_input: Union[List[EntityConfig], List[Dict[str, Any]]]) -> Dict[str, Any]:
         """
         Generate a context dictionary for code generation templates.
 
         Args:
             entities_input: One of:
-                - Legacy dict: {"entities": [{"name": "User", "fields": [...]}]}
                 - Modern list: [EntityConfig(...), EntityConfig(...)]
                 - Raw list: [{"name": "User", "fields": [...]}]
 
@@ -71,18 +62,14 @@ class ContextBuilder:
         Raises:
             ValueError: If input format is invalid or validation fails
         """
-        # Normalize input to list of entities
-        if isinstance(entities_input, dict):
-            # Legacy format: {"entities": [...]}
-            return self._build_context_legacy(entities_input)
-        elif isinstance(entities_input, list):
+        if isinstance(entities_input, list):
             if not entities_input:
                 # Empty list
                 return {"entities": [], "entity_count": 0}
 
             # Check if it's a list of Pydantic objects or raw dicts
             first_item = entities_input[0]
-            if PYDANTIC_AVAILABLE and hasattr(first_item, 'model_dump'):
+            if hasattr(first_item, 'model_dump'):
                 # List of EntityConfig objects (modern format)
                 return self._build_context_pydantic(entities_input)
             else:
@@ -91,41 +78,31 @@ class ContextBuilder:
         else:
             raise ValueError(f"Unsupported entities input type: {type(entities_input)}")
 
-    def _build_context_legacy(self, entities_dict: Dict[str, Any]) -> Dict[str, Any]:
-        """Build context from legacy dictionary format (backward compatibility)."""
-        raw_entities = entities_dict.get("entities", [])
-        if not isinstance(raw_entities, list):
-            raise ValueError("Expected 'entities' to be a list.")
-
-        return self._build_context_from_raw_entities(raw_entities)
-
     def _build_context_pydantic(self, entities: List[EntityConfig]) -> Dict[str, Any]:
         """Build context from Pydantic EntityConfig objects (modern format)."""
         # Convert Pydantic objects to dictionaries for processing
         raw_entities = [entity.model_dump() for entity in entities]
 
-        # Since Pydantic already validated, we can skip most validation
-        return self._build_context_from_raw_entities(raw_entities, skip_validation=True)
+        # Since Pydantic already validated, we can process directly
+        return self._build_context_from_raw_entities(raw_entities)
 
     def _build_context_raw_list(self, entities: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Build context from list of raw dictionaries."""
         return self._build_context_from_raw_entities(entities)
 
-    def _build_context_from_raw_entities(self, raw_entities: List[Dict[str, Any]], skip_validation: bool = False) -> Dict[str, Any]:
+    def _build_context_from_raw_entities(self, raw_entities: List[Dict[str, Any]]) -> Dict[str, Any]:
         """
         Core method to build context from raw entity dictionaries.
 
         Args:
             raw_entities: List of entity dictionaries
-            skip_validation: Skip validation if data already validated by Pydantic
         """
-        if not skip_validation:
-            self._validate_entities(raw_entities)
+        self._validate_entities(raw_entities)
 
         entities_context: List[Dict[str, Any]] = []
 
         for ent in raw_entities:
-            entity_context = self._build_entity_context(ent, skip_validation)
+            entity_context = self._build_entity_context(ent)
             entities_context.append(entity_context)
 
         # Build final context with additional metadata
@@ -139,7 +116,8 @@ class ContextBuilder:
 
         return context
 
-    def _validate_entities(self, raw_entities: List[Dict[str, Any]]) -> None:
+    @staticmethod
+    def _validate_entities(raw_entities: List[Dict[str, Any]]) -> None:
         """Validate entity list for duplicates and basic structure."""
         seen_entity_names: set = set()
         for ent in raw_entities:
@@ -148,11 +126,11 @@ class ContextBuilder:
                 raise ValueError(f"Duplicate entity name detected: '{ent_name}'")
             seen_entity_names.add(ent_name)
 
-    def _build_entity_context(self, ent: Dict[str, Any], skip_validation: bool = False) -> Dict[str, Any]:
+    def _build_entity_context(self, ent: Dict[str, Any]) -> Dict[str, Any]:
         """Build context for a single entity."""
         original_ent_name = ent.get("name")
 
-        if not skip_validation and not validate_name(original_ent_name):
+        if not validate_name(original_ent_name):
             raise ValueError(
                 f"Invalid entity name '{original_ent_name}'. "
                 "Must start with a letter and contain only letters, digits, or underscores."
@@ -168,11 +146,9 @@ class ContextBuilder:
             raise ValueError(f"Expected 'fields' for entity '{original_ent_name}' to be a list.")
 
         # Build fields context
-        fields_context, primary_keys = self._build_fields_context(
-            fields, original_ent_name, skip_validation
-        )
+        fields_context, primary_keys = self._build_fields_context(fields, original_ent_name)
 
-        if not skip_validation and not primary_keys:
+        if not primary_keys:
             raise ValueError(
                 f"Entity '{original_ent_name}' does not have any field marked as primary_key."
             )
@@ -202,18 +178,16 @@ class ContextBuilder:
     def _build_fields_context(
         self,
         fields: List[Dict[str, Any]],
-        entity_name: str,
-        skip_validation: bool = False
+        entity_name: str
     ) -> tuple[List[Dict[str, Any]], List[str]]:
         """Build context for entity fields."""
-        if not skip_validation:
-            self._validate_fields(fields, entity_name)
+        self._validate_fields(fields, entity_name)
 
         fields_context: List[Dict[str, Any]] = []
         primary_keys: List[str] = []
 
         for fld in fields:
-            field_context = self._build_field_context(fld, entity_name, skip_validation)
+            field_context = self._build_field_context(fld, entity_name)
             fields_context.append(field_context)
 
             if field_context["is_primary_key"]:
@@ -221,7 +195,8 @@ class ContextBuilder:
 
         return fields_context, primary_keys
 
-    def _validate_fields(self, fields: List[Dict[str, Any]], entity_name: str) -> None:
+    @staticmethod
+    def _validate_fields(fields: List[Dict[str, Any]], entity_name: str) -> None:
         """Validate fields for duplicates."""
         seen_field_names: set = set()
         for fld in fields:
@@ -232,16 +207,11 @@ class ContextBuilder:
                 )
             seen_field_names.add(fld_name)
 
-    def _build_field_context(
-        self,
-        fld: Dict[str, Any],
-        entity_name: str,
-        skip_validation: bool = False
-    ) -> Dict[str, Any]:
+    def _build_field_context(self, fld: Dict[str, Any], entity_name: str) -> Dict[str, Any]:
         """Build context for a single field."""
         original_field_name = fld.get("name")
 
-        if not skip_validation and not validate_name(original_field_name):
+        if not validate_name(original_field_name):
             raise ValueError(
                 f"Invalid field name '{original_field_name}' in entity '{entity_name}'. "
                 "Must start with a letter and contain only letters, digits, or underscores."
@@ -253,7 +223,7 @@ class ContextBuilder:
         fld_kebab = to_kebab_case(original_field_name)
 
         fld_type = fld.get("type")
-        if not skip_validation and fld_type not in TYPE_MAPPING:
+        if fld_type not in TYPE_MAPPING:
             raise ValueError(
                 f"Unknown field type '{fld_type}' for field '{original_field_name}' "
                 f"in entity '{entity_name}'."
@@ -295,7 +265,8 @@ class ContextBuilder:
 
         return field_context
 
-    def _get_python_type(self, field_type: str, is_nullable: bool) -> str:
+    @staticmethod
+    def _get_python_type(field_type: str, is_nullable: bool) -> str:
         """Get Python type annotation for field."""
         type_mapping = {
             "uuid": "UUID",
@@ -310,7 +281,8 @@ class ContextBuilder:
         base_type = type_mapping.get(field_type, "str")
         return f"Optional[{base_type}]" if is_nullable else base_type
 
-    def _get_typescript_type(self, field_type: str, is_nullable: bool) -> str:
+    @staticmethod
+    def _get_typescript_type(field_type: str, is_nullable: bool) -> str:
         """Get TypeScript type for field."""
         type_mapping = {
             "uuid": "string",

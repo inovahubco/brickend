@@ -3,10 +3,10 @@ test_template_engine.py
 
 Unit tests for the TemplateEngine class in brickend_core.engine.template_engine.
 Covers:
-  - LEGACY: Rendering Jinja2 templates to strings and files (existing functionality)
-  - NEW: Plugin mode with priority system (templates_user/ > core_templates)
-  - NEW: Template discovery and triplet-based access
-  - NEW: Template info and utility methods
+  - Plugin mode with priority system (templates_user/ > core_templates)
+  - Template discovery and triplet-based access
+  - Component rendering and template info methods
+  - Error handling and edge cases
 """
 
 import pytest
@@ -16,25 +16,7 @@ from brickend_core.engine.template_engine import TemplateEngine
 
 
 # =============================================================================
-# FIXTURES FOR EXISTING FUNCTIONALITY (maintain compatibility)
-# =============================================================================
-
-@pytest.fixture
-def simple_template_dir(tmp_path):
-    """
-    Create a temporary directory with a single Jinja2 template for testing.
-
-    The template will be named 'greeting.j2' and contain:
-        Hello, {{ name }}!
-    """
-    tpl_dir = tmp_path / "templates_test"
-    tpl_dir.mkdir()
-    (tpl_dir / "greeting.j2").write_text("Hello, {{ name }}!", encoding="utf-8")
-    return tpl_dir
-
-
-# =============================================================================
-# FIXTURES FOR NEW PLUGIN MODE FUNCTIONALITY
+# FIXTURES FOR PLUGIN MODE FUNCTIONALITY
 # =============================================================================
 
 @pytest.fixture
@@ -158,59 +140,7 @@ def empty_plugin_structure(tmp_path):
 
 
 # =============================================================================
-# EXISTING TESTS (maintain backward compatibility)
-# =============================================================================
-
-def test_render_to_string(simple_template_dir):
-    """
-    Test that TemplateEngine.render_to_string returns the correctly rendered text.
-
-    Given a template directory containing 'greeting.j2' with content "Hello, {{ name }}!",
-    calling render_to_string with context {"name": "Alice"} should return "Hello, Alice!".
-    """
-    engine = TemplateEngine([simple_template_dir], auto_reload=False)
-    output = engine.render_to_string("greeting.j2", {"name": "Alice"})
-    assert isinstance(output, str)
-    assert output.strip() == "Hello, Alice!"
-
-
-def test_render_to_file(simple_template_dir, tmp_path):
-    """
-    Test that TemplateEngine.render_to_file writes rendered output to the specified file.
-
-    Verifies:
-      1. The destination directory is created if it does not exist.
-      2. The rendered content "Hello, Bob!" is written to 'result.txt' under the output folder.
-    """
-    engine = TemplateEngine([simple_template_dir], auto_reload=False)
-    destination = tmp_path / "output_folder" / "result.txt"
-
-    assert not (tmp_path / "output_folder").exists()
-
-    engine.render_to_file("greeting.j2", {"name": "Bob"}, destination)
-
-    assert (tmp_path / "output_folder").exists()
-
-    assert destination.exists()
-    content = destination.read_text(encoding="utf-8").strip()
-    assert content == "Hello, Bob!"
-
-
-def test_template_not_found(simple_template_dir):
-    """
-    Test that requesting a non-existent template raises a TemplateNotFound error.
-
-    Calling render_to_string with "nonexistent.j2" should raise an exception
-    mentioning that 'nonexistent.j2' could not be found.
-    """
-    engine = TemplateEngine([simple_template_dir], auto_reload=False)
-    with pytest.raises(Exception) as exc_info:
-        engine.render_to_string("nonexistent.j2", {"name": "Test"})
-    assert "nonexistent.j2" in str(exc_info.value)
-
-
-# =============================================================================
-# NEW TESTS FOR PLUGIN MODE FUNCTIONALITY
+# PLUGIN MODE INITIALIZATION TESTS
 # =============================================================================
 
 class TestPluginModeInitialization:
@@ -222,11 +152,9 @@ class TestPluginModeInitialization:
 
         engine = TemplateEngine(base_path=base_path)
 
-        # Verify mode and attributes
-        assert engine.mode == "plugin"
+        # Verify attributes
         assert engine.base_path == base_path
         assert engine.user_templates_dir == base_path / "templates_user"
-        assert engine.template_dirs is None
 
     def test_plugin_mode_custom_user_dir(self, plugin_template_structure):
         """Test plugin mode with custom user templates directory."""
@@ -237,23 +165,14 @@ class TestPluginModeInitialization:
 
         assert engine.user_templates_dir == custom_user_dir
 
-    def test_legacy_mode_initialization(self, simple_template_dir):
-        """Test initialization in legacy mode with template_dirs."""
-        engine = TemplateEngine([simple_template_dir])
+    def test_initialization_with_auto_reload(self, plugin_template_structure):
+        """Test initialization with auto_reload option."""
+        base_path = plugin_template_structure['base_path']
 
-        # Verify mode and attributes
-        assert engine.mode == "legacy"
-        assert engine.template_dirs == [simple_template_dir]
-        assert engine.base_path is None
-        assert engine.user_templates_dir is None
+        engine = TemplateEngine(base_path=base_path, auto_reload=True)
 
-    def test_invalid_initialization_raises_error(self):
-        """Test that invalid initialization raises ValueError."""
-        with pytest.raises(ValueError) as exc_info:
-            TemplateEngine()  # Neither template_dirs nor base_path provided
-
-        error_msg = str(exc_info.value)
-        assert "Either template_dirs (legacy) or base_path (plugin mode) must be provided" in error_msg
+        assert engine.auto_reload is True
+        assert engine.env.auto_reload is True
 
 
 class TestTemplatePriority:
@@ -304,19 +223,9 @@ class TestTemplatePriority:
         assert "Template not found: back/nonexistent/models" in error_msg
         assert "Searched in:" in error_msg
 
-    def test_get_template_path_requires_plugin_mode(self, simple_template_dir):
-        """Test that get_template_path raises RuntimeError in legacy mode."""
-        engine = TemplateEngine([simple_template_dir])  # Legacy mode
-
-        with pytest.raises(RuntimeError) as exc_info:
-            engine.get_template_path("back", "fastapi", "models")
-
-        error_msg = str(exc_info.value)
-        assert "requires plugin mode initialization" in error_msg
-
 
 class TestComponentRendering:
-    """Test suite for new component-based rendering methods."""
+    """Test suite for component-based rendering methods."""
 
     def test_render_component_to_string(self, plugin_template_structure):
         """Test render_component_to_string method."""
@@ -363,15 +272,38 @@ class TestComponentRendering:
         assert "Core FastAPI Schemas" in result
         assert "DirectEntity" in result
 
-    def test_render_component_requires_plugin_mode(self, simple_template_dir):
-        """Test that component rendering methods require plugin mode."""
-        engine = TemplateEngine([simple_template_dir])  # Legacy mode
+    def test_basic_render_methods_still_work(self, plugin_template_structure):
+        """Test that basic render_to_string and render_to_file methods still work."""
+        base_path = plugin_template_structure['base_path']
+        engine = TemplateEngine(base_path=base_path)
 
-        with pytest.raises(RuntimeError):
-            engine.render_component_to_string("back", "fastapi", "models", {})
+        # Create a simple template in user directory for testing
+        simple_template = engine.user_templates_dir / "simple.j2"
+        simple_template.parent.mkdir(parents=True, exist_ok=True)
+        simple_template.write_text("Hello {{ name }}!", encoding="utf-8")
 
-        with pytest.raises(RuntimeError):
-            engine.render_component_to_file("back", "fastapi", "models", {}, Path("out.py"))
+        # Should be able to render using basic method
+        result = engine.render_to_string("simple.j2", {"name": "World"})
+        assert "Hello World!" in result
+
+    def test_render_to_file_basic(self, plugin_template_structure, tmp_path):
+        """Test basic render_to_file method."""
+        base_path = plugin_template_structure['base_path']
+        engine = TemplateEngine(base_path=base_path)
+
+        # Create a simple template
+        simple_template = engine.user_templates_dir / "file_test.j2"
+        simple_template.parent.mkdir(parents=True, exist_ok=True)
+        simple_template.write_text("Content: {{ content }}", encoding="utf-8")
+
+        destination = tmp_path / "output" / "test.txt"
+
+        engine.render_to_file("file_test.j2", {"content": "test data"}, destination)
+
+        # Verify file was created and has correct content
+        assert destination.exists()
+        content = destination.read_text(encoding="utf-8")
+        assert "Content: test data" in content
 
 
 class TestTemplateDiscovery:
@@ -457,57 +389,6 @@ class TestTemplateDiscovery:
         assert missing_info['priority'] is None
         assert missing_info['path'] is None
 
-    def test_utility_methods_require_plugin_mode(self, simple_template_dir):
-        """Test that utility methods require plugin mode."""
-        engine = TemplateEngine([simple_template_dir])  # Legacy mode
-
-        with pytest.raises(RuntimeError):
-            engine.list_available_templates()
-
-        # has_user_template should return False in legacy mode
-        assert engine.has_user_template("back", "fastapi", "models") is False
-
-        with pytest.raises(RuntimeError):
-            engine.get_template_info("back", "fastapi", "models")
-
-
-class TestLegacyCompatibility:
-    """Test suite for backward compatibility with legacy mode."""
-
-    def test_legacy_methods_work_in_plugin_mode(self, plugin_template_structure):
-        """Test that legacy methods still work in plugin mode."""
-        base_path = plugin_template_structure['base_path']
-        engine = TemplateEngine(base_path=base_path)
-
-        # Test render_to_string works (should find template in search paths)
-        # Note: This might not work perfectly due to path structure, but the method should exist
-        assert hasattr(engine, 'render_to_string')
-        assert hasattr(engine, 'render_to_file')
-
-        # Create a simple template in user directory for testing
-        simple_template = engine.user_templates_dir / "simple.j2"
-        simple_template.parent.mkdir(parents=True, exist_ok=True)
-        simple_template.write_text("Hello {{ name }}!", encoding="utf-8")
-
-        # Should be able to render using legacy method
-        result = engine.render_to_string("simple.j2", {"name": "World"})
-        assert "Hello World!" in result
-
-    def test_plugin_methods_work_independently(self, plugin_template_structure):
-        """Test that new plugin methods work independently of legacy methods."""
-        base_path = plugin_template_structure['base_path']
-        engine = TemplateEngine(base_path=base_path)
-
-        # Plugin methods should work
-        template_path = engine.get_template_path("back", "fastapi", "models")
-        assert template_path.exists()
-
-        templates = engine.list_available_templates()
-        assert len(templates) > 0
-
-        info = engine.get_template_info("back", "fastapi", "models")
-        assert info['exists'] is True
-
 
 class TestErrorHandling:
     """Test suite for comprehensive error handling."""
@@ -529,7 +410,7 @@ class TestErrorHandling:
         engine = TemplateEngine(base_path=empty_plugin_structure)
 
         # Should initialize without error
-        assert engine.mode == "plugin"
+        assert engine.base_path == empty_plugin_structure
 
         # Should return empty results for discovery
         templates = engine.list_available_templates()
@@ -557,6 +438,64 @@ class TestErrorHandling:
         assert len(str(exc_info.value)) > 0  # Non-empty error message
         # Optionally, check it's a Jinja2 related error
         assert hasattr(exc_info.value, '__class__')
+
+    def test_template_not_found_basic_render(self, plugin_template_structure):
+        """Test that requesting a non-existent template raises appropriate error."""
+        base_path = plugin_template_structure['base_path']
+        engine = TemplateEngine(base_path=base_path)
+
+        with pytest.raises(Exception) as exc_info:
+            engine.render_to_string("nonexistent.j2", {"name": "Test"})
+        assert "nonexistent.j2" in str(exc_info.value)
+
+
+class TestAdvancedFeatures:
+    """Test suite for advanced template engine features."""
+
+    def test_user_templates_directory_creation(self, plugin_structure_no_user_templates):
+        """Test behavior when user templates directory doesn't exist initially."""
+        base_path = plugin_structure_no_user_templates
+
+        # User templates directory doesn't exist initially
+        user_dir = base_path / "templates_user"
+        assert not user_dir.exists()
+
+        engine = TemplateEngine(base_path=base_path, user_templates_dir=user_dir)
+
+        # Should initialize successfully
+        assert engine.user_templates_dir == user_dir
+
+        # Should fall back to core templates
+        template_path = engine.get_template_path("back", "fastapi", "models")
+        assert "integrations" in str(template_path)
+
+        content = template_path.read_text(encoding="utf-8")
+        assert "Core Only Template" in content
+
+    def test_relative_user_templates_directory(self, plugin_template_structure):
+        """Test initialization with relative user templates directory."""
+        base_path = plugin_template_structure['base_path']
+
+        # Use relative path
+        relative_user_dir = Path("custom_user_templates")
+        engine = TemplateEngine(base_path=base_path, user_templates_dir=relative_user_dir)
+
+        # Should resolve relative to base_path
+        expected_path = base_path / relative_user_dir
+        assert engine.user_templates_dir == expected_path
+
+    def test_absolute_user_templates_directory(self, plugin_template_structure, tmp_path):
+        """Test initialization with absolute user templates directory."""
+        base_path = plugin_template_structure['base_path']
+
+        # Use absolute path
+        absolute_user_dir = tmp_path / "absolute_user_templates"
+        absolute_user_dir.mkdir()
+
+        engine = TemplateEngine(base_path=base_path, user_templates_dir=absolute_user_dir)
+
+        # Should use absolute path as-is
+        assert engine.user_templates_dir == absolute_user_dir
 
 
 # =============================================================================
@@ -610,23 +549,48 @@ class TestIntegration:
         assert "Core Django Models" in result
         assert "DjangoEntity" in result
 
-    def test_mixed_mode_compatibility(self, plugin_template_structure):
-        """Test that both legacy and plugin interfaces work together."""
+    def test_multiple_stacks_and_categories(self, plugin_template_structure):
+        """Test that engine works with multiple stacks and categories."""
         base_path = plugin_template_structure['base_path']
         engine = TemplateEngine(base_path=base_path)
 
-        # Create simple template for legacy interface
-        simple_template = engine.user_templates_dir / "legacy_test.j2"
-        simple_template.write_text("Legacy: {{ value }}", encoding="utf-8")
+        # Test different backends
+        fastapi_result = engine.render_component_to_string(
+            "back", "fastapi", "schemas", {"entity": {"name": "FastAPIEntity"}}
+        )
+        assert "Core FastAPI Schemas" in fastapi_result
 
-        # Use legacy interface
-        legacy_result = engine.render_to_string("legacy_test.j2", {"value": "works"})
-        assert "Legacy: works" in legacy_result
+        django_result = engine.render_component_to_string(
+            "back", "django", "serializers", {"entity": {"name": "DjangoEntity"}}
+        )
+        assert "Core Django Serializers" in django_result
 
-        # Use plugin interface
-        plugin_result = engine.render_component_to_string("back", "fastapi", "models", {"entity": {"name": "Mixed"}})
-        assert "Mixed" in plugin_result
+        # Test infrastructure
+        infra_result = engine.render_component_to_string(
+            "infra", "aws_cdk", "stack", {"project": {"name": "TestProject"}}
+        )
+        assert "Core AWS CDK Stack" in infra_result
+        assert "TestProject" in infra_result
 
-        # Both should work independently
-        assert "Legacy" in legacy_result
-        assert "Mixed" in plugin_result
+    def test_template_engine_reusability(self, plugin_template_structure):
+        """Test that template engine can be reused for multiple operations."""
+        base_path = plugin_template_structure['base_path']
+        engine = TemplateEngine(base_path=base_path)
+
+        # Multiple operations with same engine
+        for i in range(3):
+            context = {"entity": {"name": f"Entity{i}"}}
+            result = engine.render_component_to_string("back", "fastapi", "models", context)
+            assert f"Entity{i}" in result
+            assert "USER OVERRIDE" in result
+
+        # Different templates with same engine
+        templates_to_test = [
+            ("back", "fastapi", "schemas"),
+            ("back", "django", "models"),
+            ("infra", "aws_cdk", "stack")
+        ]
+
+        for category, stack, component in templates_to_test:
+            info = engine.get_template_info(category, stack, component)
+            assert info['exists'] is True

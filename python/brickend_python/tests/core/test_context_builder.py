@@ -17,7 +17,7 @@ from brickend_core.engine.context_builder import ContextBuilder
 
 def make_simple_entities_dict() -> dict:
     """
-    Helper to create a valid entities dictionary for testing.
+    Helper to create a valid entities list for testing.
 
     Creates:
       - One entity named 'User'.
@@ -26,7 +26,7 @@ def make_simple_entities_dict() -> dict:
           * 'email': type 'string', primary_key=False, unique=True, nullable=False.
 
     Returns:
-        dict: Dictionary representing the entities configuration.
+        dict: Dictionary representing the entities' configuration.
     """
     return {
         "entities": [
@@ -72,7 +72,8 @@ def test_build_context_success():
     builder = ContextBuilder()
     entities_dict = make_simple_entities_dict()
 
-    ctx = builder.build_context(entities_dict)
+    # Pass list of entities rather than the whole dict
+    ctx = builder.build_context(entities_dict["entities"])
 
     assert "entities" in ctx
     assert "entity_count" in ctx
@@ -131,7 +132,7 @@ def test_invalid_entity_name():
     }
 
     with pytest.raises(ValueError) as exc_info:
-        builder.build_context(bad_entities)
+        builder.build_context(bad_entities["entities"])
     assert "Invalid entity name" in str(exc_info.value)
 
 
@@ -155,7 +156,7 @@ def test_entity_without_primary_key():
     }
 
     with pytest.raises(ValueError) as exc_info:
-        builder.build_context(no_pk_entities)
+        builder.build_context(no_pk_entities["entities"])
     assert "does not have any field marked as primary_key" in str(exc_info.value)
 
 
@@ -185,7 +186,7 @@ def test_duplicate_entity_names():
     }
 
     with pytest.raises(ValueError) as exc_info:
-        builder.build_context(dup_entities)
+        builder.build_context(dup_entities["entities"])
     assert "Duplicate entity name" in str(exc_info.value)
 
 
@@ -210,5 +211,5 @@ def test_duplicate_field_names_in_entity():
     }
 
     with pytest.raises(ValueError) as exc_info:
-        builder.build_context(dup_field_entities)
+        builder.build_context(dup_field_entities["entities"])
     assert "Duplicate field name" in str(exc_info.value)

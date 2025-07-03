@@ -12,7 +12,7 @@ import ruamel.yaml
 from pydantic import ValidationError
 
 from brickend_core.config.validation_schemas import EntitiesFile
-from brickend_core.config.project_schema import BrickendProject, ProjectInfo, StackConfig
+from brickend_core.config.project_schema import BrickendProject
 
 
 def load_entities(path: Path) -> Dict[str, Any]:
@@ -81,7 +81,6 @@ def load_project_config(path: Path = Path("brickend.yaml")) -> BrickendProject:
     """
     yaml = ruamel.yaml.YAML(typ="safe")
 
-    # Try to load brickend.yaml first
     if path.exists():
         try:
             with path.open("r", encoding="utf-8") as f:
@@ -100,6 +99,7 @@ def load_project_config(path: Path = Path("brickend.yaml")) -> BrickendProject:
 
         # Handle external entities file if needed
         if config.is_entities_external():
+            original_path = str(config.entities)
             entities_file_path = config.get_entities_file_path()
 
             # Resolve relative path based on brickend.yaml location
@@ -124,50 +124,22 @@ def load_project_config(path: Path = Path("brickend.yaml")) -> BrickendProject:
             except ValidationError as e:
                 raise ValueError(f"Validation error in entities file '{entities_file_path}': {e}")
 
-            # Replace string reference with actual entities list
-            raw_data["entities"] = entities_file.model_dump()["entities"]
-
-            # Re-validate the complete configuration
-            try:
-                config = BrickendProject.model_validate(raw_data)
-            except ValidationError as e:
-                raise ValueError(f"Validation error after loading external entities: {e}")
-
-        return config
-
-    # Fallback: try to load legacy entities.yaml
-    entities_path = Path("entities.yaml")
-    if entities_path.exists():
-        try:
-            with entities_path.open("r", encoding="utf-8") as f:
-                entities_raw_data = yaml.load(f)
-        except ruamel.yaml.YAMLError as e:
-            raise ValueError(f"Failed to parse legacy entities YAML at {entities_path}: {e}")
-
-        try:
-            entities_file = EntitiesFile.model_validate(entities_raw_data)
-        except ValidationError as e:
-            raise ValueError(f"Validation error in legacy entities file '{entities_path}': {e}")
-
-        # Create minimal BrickendProject configuration from entities.yaml
-        try:
+            # Create new config with loaded entities but preserve original path
             config = BrickendProject(
-                project=ProjectInfo(
-                    name="legacy_project",
-                    description="Legacy project migrated from entities.yaml",
-                    version="1.0.0"
-                ),
-                stack=StackConfig(),
-                entities=entities_file.entities
+                project=config.project,
+                stack=config.stack,
+                entities=entities_file.entities,
+                settings=config.settings,
+                deploy=config.deploy,
+                plugins=config.plugins,
+                custom=config.custom
             )
-        except ValidationError as e:
-            raise ValueError(f"Failed to create legacy project configuration: {e}")
+            config._original_entities_path = original_path
 
         return config
 
-    # Neither brickend.yaml nor entities.yaml found
     raise FileNotFoundError(
-        f"No configuration found. Expected either '{path}' or './entities.yaml' to exist."
+        f"No configuration file found."
     )
 
 
@@ -236,3 +208,49 @@ def validate_entities_file_reference(entities_ref: str, base_path: Path = Path("
         raise ValueError(f"Entities reference must point to a file: {entities_path}")
 
     return entities_path
+
+
+# En src/brickend_core/utils/yaml_loader.py
+
+def save_project_config_preserving_mode(config: BrickendProject, path: Path = Path("brickend.yaml")) -> None:
+    """
+    Save a BrickendProject configuration preserving the original entities' mode.
+
+    If entities were originally external, saves them to the external file and
+    keeps the reference in brickend.yaml.
+    """
+    yaml = ruamel.yaml.YAML()
+    yaml.default_flow_style = False
+    yaml.width = 120
+    yaml.indent(mapping=2, sequence=4, offset=2)
+
+    try:
+        # Check if entities were originally external
+        if config._original_entities_path:
+            # Save entities to external file
+            entities_path = Path(config._original_entities_path)
+
+            # Resolve relative to brickend.yaml location
+            if not entities_path.is_absolute():
+                entities_path = path.parent / entities_path
+
+            # Save entities to external file
+            entities_data = {
+                "entities": [entity.model_dump() for entity in config.entities]
+            }
+
+            with entities_path.open("w", encoding="utf-8") as f:
+                yaml.dump(entities_data, f)
+
+            # Save brickend.yaml with external reference
+            config_dict = config.model_dump(exclude_none=True)
+            config_dict["entities"] = config._original_entities_path
+
+            with path.open("w", encoding="utf-8") as f:
+                yaml.dump(config_dict, f)
+        else:
+            # Save normally (inline mode)
+            save_project_config(config, path)
+
+    except Exception as e:
+        raise ValueError(f"Failed to save project configuration: {e}")

@@ -3,17 +3,15 @@ test_yaml_loader.py
 
 Unit tests for yaml_loader functions in brickend_core.utils.yaml_loader.
 Covers:
-  - LEGACY: load_entities function (existing functionality)
-  - NEW: load_project_config function (hybrid configuration)
-  - NEW: save_project_config function
-  - NEW: validate_entities_file_reference utility
+  - load_project_config function (hybrid configuration)
+  - save_project_config function
+  - validate_entities_file_reference utility
 """
 
 import pytest
 from pathlib import Path
 
 from brickend_core.utils.yaml_loader import (
-    load_entities,
     load_project_config,
     save_project_config,
     validate_entities_file_reference
@@ -22,124 +20,7 @@ from brickend_core.config.project_schema import BrickendProject, ProjectInfo, St
 
 
 # =============================================================================
-# FIXTURES FOR EXISTING FUNCTIONALITY
-# =============================================================================
-
-@pytest.fixture
-def valid_entities_yaml(tmp_path):
-    """
-    Create a minimal valid entities YAML file for testing.
-
-    Args:
-        tmp_path (Path): Temporary directory provided by pytest.
-
-    Returns:
-        Path: Path to the created valid entities YAML file.
-    """
-    content = """
-    entities:
-      - name: User
-        fields:
-          - name: id
-            type: uuid
-          - name: email
-            type: string
-    """
-    file_path = tmp_path / "entities_valid.yaml"
-    file_path.write_text(content, encoding="utf-8")
-    return file_path
-
-
-@pytest.fixture
-def missing_entities_key(tmp_path):
-    """
-    Create a YAML file that does not contain the 'entities' key to trigger a missing-key error.
-
-    Args:
-        tmp_path (Path): Temporary directory provided by pytest.
-
-    Returns:
-        Path: Path to the YAML file without the 'entities' key.
-    """
-    content = """
-    models:
-      - name: Product
-        fields:
-          - name: id
-            type: uuid
-    """
-    file_path = tmp_path / "no_entities.yaml"
-    file_path.write_text(content, encoding="utf-8")
-    return file_path
-
-
-@pytest.fixture
-def entities_not_list(tmp_path):
-    """
-    Create a YAML file where 'entities' is not a list to trigger a type error.
-
-    Args:
-        tmp_path (Path): Temporary directory provided by pytest.
-
-    Returns:
-        Path: Path to the malformed entities YAML file.
-    """
-    content = """
-    entities: "this should be a list, not a string"
-    """
-    file_path = tmp_path / "entities_not_list.yaml"
-    file_path.write_text(content, encoding="utf-8")
-    return file_path
-
-
-@pytest.fixture
-def invalid_field_type(tmp_path):
-    """
-    Create a YAML file where one field has an invalid type not in ALLOWED_FIELD_TYPES.
-
-    Args:
-        tmp_path (Path): Temporary directory provided by pytest.
-
-    Returns:
-        Path: Path to the YAML file with invalid field type.
-    """
-    content = """
-    entities:
-      - name: Customer
-        fields:
-          - name: id
-            type: uuid
-          - name: age
-            type: int32  # not in ALLOWED_FIELD_TYPES
-    """
-    file_path = tmp_path / "invalid_field_type.yaml"
-    file_path.write_text(content, encoding="utf-8")
-    return file_path
-
-
-@pytest.fixture
-def entity_with_no_fields(tmp_path):
-    """
-    Create a YAML file where an entity has an empty 'fields' list to trigger a validation error.
-
-    Args:
-        tmp_path (Path): Temporary directory provided by pytest.
-
-    Returns:
-        Path: Path to the YAML file with an entity missing fields.
-    """
-    content = """
-    entities:
-      - name: EmptyEntity
-        fields: []
-    """
-    file_path = tmp_path / "entity_no_fields.yaml"
-    file_path.write_text(content, encoding="utf-8")
-    return file_path
-
-
-# =============================================================================
-# FIXTURES FOR NEW PROJECT CONFIG FUNCTIONALITY
+# FIXTURES FOR PROJECT CONFIG FUNCTIONALITY
 # =============================================================================
 
 @pytest.fixture
@@ -267,30 +148,6 @@ entities:
 
 
 @pytest.fixture
-def legacy_entities_only(tmp_path):
-    """
-    Create only entities.yaml file (no brickend.yaml) for legacy fallback testing.
-
-    Returns:
-        Path: Path to entities.yaml
-    """
-    content = """
-entities:
-  - name: LegacyModel
-    fields:
-      - name: id
-        type: uuid
-        primary_key: true
-      - name: legacy_field
-        type: string
-"""
-
-    file_path = tmp_path / "entities.yaml"
-    file_path.write_text(content, encoding="utf-8")
-    return file_path
-
-
-@pytest.fixture
 def brickend_yaml_missing_external_entities(tmp_path):
     """
     Create brickend.yaml that references non-existent entities file.
@@ -341,100 +198,32 @@ settings:
     return file_path
 
 
-# =============================================================================
-# EXISTING TESTS (maintain backward compatibility)
-# =============================================================================
-
-def test_load_entities_success(valid_entities_yaml):
+@pytest.fixture
+def valid_entities_for_validation(tmp_path):
     """
-    Test loading a valid entities YAML file.
+    Create a valid entities.yaml file for validation testing.
 
-    Verifies:
-      - Returns a dict containing a non-empty 'entities' list.
-      - The first entity has correct 'name' and 'fields' entries.
-
-    Args:
-        valid_entities_yaml (Path): Path to a valid entities YAML file.
+    Returns:
+        Path: Path to valid entities.yaml
     """
-    data = load_entities(valid_entities_yaml)
-    assert isinstance(data, dict)
-    assert "entities" in data
-    assert isinstance(data["entities"], list)
-    first_entity = data["entities"][0]
-    assert first_entity["name"] == "User"
-    assert isinstance(first_entity["fields"], list)
-    assert first_entity["fields"][0]["name"] == "id"
-    assert first_entity["fields"][0]["type"] == "uuid"
+    content = """
+entities:
+  - name: TestEntity
+    fields:
+      - name: id
+        type: uuid
+        primary_key: true
+      - name: name
+        type: string
+"""
 
-
-def test_load_entities_file_not_found():
-    """
-    Test that load_entities raises FileNotFoundError when the file does not exist.
-
-    Attempts to load from a non-existent path and expects FileNotFoundError.
-    """
-    fake_path = Path("/does/not/exist/entities.yaml")
-    with pytest.raises(FileNotFoundError) as exc_info:
-        load_entities(fake_path)
-    assert "Entities file not found" in str(exc_info.value)
-
-
-def test_load_entities_missing_key(missing_entities_key):
-    """
-    Test that load_entities raises ValueError for a YAML missing the 'entities' key.
-
-    Args:
-        missing_entities_key (Path): Path to a YAML file lacking the 'entities' key.
-    """
-    with pytest.raises(ValueError) as exc_info:
-        load_entities(missing_entities_key)
-    msg = str(exc_info.value)
-    assert "Field required" in msg and "entities" in msg
-
-
-def test_load_entities_entities_not_list(entities_not_list):
-    """
-    Test that load_entities raises ValueError when 'entities' is not a list.
-
-    Args:
-        entities_not_list (Path): Path to a YAML file where 'entities' is a string.
-    """
-    with pytest.raises(ValueError) as exc_info:
-        load_entities(entities_not_list)
-    msg = str(exc_info.value)
-    assert ("Input should be a valid list" in msg or
-            "value is not a valid list" in msg or
-            "must be a list" in msg)
-
-
-def test_load_entities_invalid_field_type(invalid_field_type):
-    """
-    Test that load_entities raises ValueError for an invalid field type in the YAML.
-
-    Args:
-        invalid_field_type (Path): Path to a YAML file containing an invalid field type.
-    """
-    with pytest.raises(ValueError) as exc_info:
-        load_entities(invalid_field_type)
-    msg = str(exc_info.value)
-    assert "Invalid field type 'int32'" in msg
-
-
-def test_load_entities_entity_with_no_fields(entity_with_no_fields):
-    """
-    Test that load_entities raises ValueError when an entity has no fields defined.
-
-    Args:
-        entity_with_no_fields (Path): Path to a YAML file where an entity's 'fields' list is empty.
-    """
-    with pytest.raises(ValueError) as exc_info:
-        load_entities(entity_with_no_fields)
-    msg = str(exc_info.value)
-    assert "at least one field defined" in msg
+    file_path = tmp_path / "test_entities.yaml"
+    file_path.write_text(content, encoding="utf-8")
+    return file_path
 
 
 # =============================================================================
-# NEW TESTS FOR PROJECT CONFIG (hybrid configuration)
+# PROJECT CONFIG TESTS
 # =============================================================================
 
 class TestProjectConfig:
@@ -528,36 +317,6 @@ class TestProjectConfig:
         finally:
             os.chdir(original_cwd)
 
-    def test_fallback_to_entities_yaml(self, legacy_entities_only, tmp_path):
-        """Test fallback to legacy entities.yaml when brickend.yaml doesn't exist."""
-        import os
-        original_cwd = os.getcwd()
-        try:
-            os.chdir(tmp_path)
-
-            # Try to load brickend.yaml (doesn't exist), should fall back to entities.yaml
-            config = load_project_config()
-
-            # Verify legacy project defaults
-            assert config.project.name == "legacy_project"
-            assert config.project.description == "Legacy project migrated from entities.yaml"
-            assert config.project.version == "1.0.0"
-
-            # Verify default stack config
-            assert config.stack.back == "fastapi"
-            assert config.stack.database == "postgresql"
-
-            # Verify entities were loaded from legacy file
-            assert isinstance(config.entities, list)
-            assert len(config.entities) == 1
-            assert config.entities[0].name == "LegacyModel"
-
-            # Verify default settings
-            assert config.settings.auto_migrations is True
-            assert config.settings.api_docs is True
-
-        finally:
-            os.chdir(original_cwd)
 
     def test_missing_entities_file_raises_error(self, brickend_yaml_missing_external_entities, tmp_path):
         """Test error when external entities file referenced in brickend.yaml doesn't exist."""
@@ -586,10 +345,9 @@ class TestProjectConfig:
             with pytest.raises(FileNotFoundError) as exc_info:
                 load_project_config()
 
-            error_msg = str(exc_info.value)
-            assert "No configuration found" in error_msg
-            assert "brickend.yaml" in error_msg
-            assert "entities.yaml" in error_msg
+            error_msg = str(exc_info.value).lower()
+            assert "configuration" in error_msg
+            assert "found" in error_msg
 
         finally:
             os.chdir(original_cwd)
@@ -648,6 +406,41 @@ entities:
         assert len(config.entities) == 1
         assert config.entities[0].name == "NestedEntity"
 
+    def test_default_brickend_yaml_loading(self, tmp_path):
+        """Test loading default brickend.yaml from current directory."""
+        # Create brickend.yaml in temp directory
+        brickend_content = """
+project:
+  name: default_project
+
+stack:
+  back: fastapi
+
+entities:
+  - name: DefaultEntity
+    fields:
+      - name: id
+        type: uuid
+        primary_key: true
+"""
+        brickend_path = tmp_path / "brickend.yaml"
+        brickend_path.write_text(brickend_content, encoding="utf-8")
+
+        import os
+        original_cwd = os.getcwd()
+        try:
+            os.chdir(tmp_path)
+
+            # Load without specifying path - should find brickend.yaml in current dir
+            config = load_project_config()
+
+            assert config.project.name == "default_project"
+            assert len(config.entities) == 1
+            assert config.entities[0].name == "DefaultEntity"
+
+        finally:
+            os.chdir(original_cwd)
+
 
 class TestSaveProjectConfig:
     """Test suite for saving project configuration."""
@@ -699,29 +492,53 @@ class TestSaveProjectConfig:
         finally:
             os.chdir(original_cwd)
 
-
-class TestValidateEntitiesFileReference:
-    """Test suite for entities file reference validation."""
-
-    def test_validate_existing_file(self, valid_entities_yaml):
-        """Test validation of existing entities file."""
-        resolved_path = validate_entities_file_reference(str(valid_entities_yaml))
-        assert resolved_path.exists()
-        assert resolved_path.is_file()
-
-    def test_validate_relative_path(self, tmp_path):
-        """Test validation with relative path."""
-        # Create entities file
-        entities_path = tmp_path / "test_entities.yaml"
-        entities_path.write_text("entities: []", encoding="utf-8")
+    def test_save_with_default_path(self, tmp_path):
+        """Test saving with default brickend.yaml path."""
+        config = BrickendProject(
+            project=ProjectInfo(name="default_save", version="1.0.0"),
+            stack=StackConfig(back="django"),
+            entities=[]
+        )
 
         import os
         original_cwd = os.getcwd()
         try:
             os.chdir(tmp_path)
 
+            # Save without specifying path
+            save_project_config(config)
+
+            # Verify file was created in current directory
+            default_path = tmp_path / "brickend.yaml"
+            assert default_path.exists()
+
+            # Load and verify
+            loaded_config = load_project_config()
+            assert loaded_config.project.name == "default_save"
+
+        finally:
+            os.chdir(original_cwd)
+
+
+class TestValidateEntitiesFileReference:
+    """Test suite for entities file reference validation."""
+
+    def test_validate_existing_file(self, valid_entities_for_validation):
+        """Test validation of existing entities file."""
+        resolved_path = validate_entities_file_reference(str(valid_entities_for_validation))
+        assert resolved_path.exists()
+        assert resolved_path.is_file()
+
+    def test_validate_relative_path(self, valid_entities_for_validation, tmp_path):
+        """Test validation with relative path."""
+        import os
+        original_cwd = os.getcwd()
+        try:
+            os.chdir(tmp_path)
+
             # Test relative path
-            resolved_path = validate_entities_file_reference("./test_entities.yaml")
+            relative_name = valid_entities_for_validation.name
+            resolved_path = validate_entities_file_reference(f"./{relative_name}")
             assert resolved_path.exists()
 
         finally:
@@ -750,6 +567,13 @@ class TestValidateEntitiesFileReference:
             validate_entities_file_reference(str(test_dir))
 
         assert "must point to a file" in str(exc_info.value)
+
+    def test_validate_absolute_path(self, valid_entities_for_validation):
+        """Test validation with absolute path."""
+        absolute_path = str(valid_entities_for_validation.absolute())
+        resolved_path = validate_entities_file_reference(absolute_path)
+        assert resolved_path.exists()
+        assert resolved_path.is_absolute()
 
 
 # =============================================================================
@@ -811,3 +635,52 @@ class TestIntegration:
         assert len(entity.fields) == 3
         assert entity.fields[0].name == "id"
         assert entity.fields[0].primary_key is True
+
+    def test_external_entities_workflow(self, tmp_path):
+        """Test workflow with external entities file management."""
+        import os
+        original_cwd = os.getcwd()
+        try:
+            os.chdir(tmp_path)
+
+            # 1. Create brickend.yaml with external entities reference
+            brickend_content = """
+project:
+  name: external_workflow
+
+stack:
+  back: fastapi
+
+entities: "./custom_entities.yaml"
+"""
+            brickend_path = tmp_path / "brickend.yaml"
+            brickend_path.write_text(brickend_content, encoding="utf-8")
+
+            # 2. Create entities file
+            entities_content = """
+entities:
+  - name: WorkflowEntity
+    fields:
+      - name: id
+        type: uuid
+        primary_key: true
+      - name: status
+        type: string
+"""
+            entities_path = tmp_path / "custom_entities.yaml"
+            entities_path.write_text(entities_content, encoding="utf-8")
+
+            # 3. Load project config
+            config = load_project_config()
+
+            # 4. Verify external entities were loaded
+            assert config.project.name == "external_workflow"
+            assert len(config.entities) == 1
+            assert config.entities[0].name == "WorkflowEntity"
+
+            # 5. Validate entities file reference
+            validated_path = validate_entities_file_reference("./custom_entities.yaml")
+            assert validated_path.exists()
+
+        finally:
+            os.chdir(original_cwd)
